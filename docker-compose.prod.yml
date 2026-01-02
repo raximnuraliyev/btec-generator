@@ -1,0 +1,148 @@
+# Docker Compose - Production Stack
+# BTEC Generator - AI Academic Assignment Generator
+#
+# For production deployment on a VPS/server
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d --build
+#   docker-compose -f docker-compose.prod.yml down
+
+services:
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: btec-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-btec}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-btec_generator}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-btec} -d ${POSTGRES_DB:-btec_generator}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - btec-internal
+
+  # =============================================================================
+  # Redis (Job Queue)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: btec-redis-prod
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - btec-internal
+
+  # =============================================================================
+  # Backend API Server
+  # =============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: btec-backend-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-btec}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-btec_generator}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 7d
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AI_MODEL: claude-3-5-sonnet-20241022
+      AI_MAX_TOKENS: 4096
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yourdomain.com}
+      FRONTEND_URL: ${FRONTEND_URL:-https://yourdomain.com}
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - btec-internal
+      - btec-external
+
+  # =============================================================================
+  # Frontend (Nginx)
+  # =============================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: btec-frontend-prod
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - btec-external
+
+  # =============================================================================
+  # Nginx Reverse Proxy (with SSL)
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: btec-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - btec-external
+
+  # =============================================================================
+  # Certbot (SSL Certificates)
+  # =============================================================================
+  certbot:
+    image: certbot/certbot
+    container_name: btec-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_uploads:
+  backend_logs:
+
+networks:
+  btec-internal:
+    driver: bridge
+  btec-external:
+    driver: bridge

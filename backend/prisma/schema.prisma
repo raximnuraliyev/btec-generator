@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  USER
+  VIP
+}
+
+enum Plan {
+  PASS
+  MERIT
+  DISTINCTION
+}
+
+enum AssignmentStatus {
+  DRAFT
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum Grade {
+  PASS
+  MERIT
+  DISTINCTION
+}
+
+enum Language {
+  en
+  ru
+  uz
+  es
+}
+
+enum TokenPlanType {
+  FREE
+  BASIC
+  PRO
+  UNLIMITED
+}
+
+model User {
+  id                        String             @id @default(uuid())
+  email                     String             @unique
+  password                  String
+  role                      UserRole           @default(USER)
+  trialTokens               Int                @default(5000)
+  plan                      Plan?
+  assignmentsUsedInPlan     Int                @default(0)
+  totalTokensUsedAllTime    Int                @default(0)
+  totalAssignmentsGenerated Int                @default(0)
+  lastGenerationAt          DateTime?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  
+  studentProfile      StudentProfile?
+  briefs              Brief[]
+  assignments         Assignment[]
+  userFlags           UserFlag[]
+  tokenPlan           TokenPlan?
+  tokenTransactions   TokenTransaction[]
+  issues              Issue[]
+  
+  @@index([email])
+  @@index([role])
+}
+
+model StudentProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  fullName       String
+  universityName String
+  faculty        String
+  groupName      String
+  city           String
+  academicYear   String?
+  confirmedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+model UserFlag {
+  id          String   @id @default(uuid())
+  userId      String
+  reason      String
+  description String?  @db.Text
+  severity    String   @default("LOW")
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([resolved])
+}
+
+model Brief {
+  id                    String   @id @default(uuid())
+  
+  // Core identifiers
+  subjectName           String
+  unitName              String
+  unitCode              String
+  level                 Int
+  semester              String   // "1" or "2"
+  
+  // Learning content
+  learningAims          String[]
+  vocationalScenario    String   @db.Text
+  
+  // Tasks structure
+  tasks                 Json     // Array of TaskBlock objects
+  
+  // Assessment criteria  
+  assessmentCriteria    Json     // { pass: string[], merit: string[], distinction: string[] }
+  
+  // Additional requirements
+  checklistOfEvidence   String[]
+  sourcesOfInformation  String[]
+  
+  // Publishing control
+  status                String   @default("DRAFT") // "DRAFT" | "PUBLISHED"
+  
+  // Metadata
+  createdById           String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  createdBy             User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  snapshots             ResolvedBriefSnapshot[]
+  
+  @@unique([unitCode, level, semester], name: "unique_brief")
+  @@index([level])
+  @@index([createdById])
+  @@index([status])
+}
+
+model ResolvedBriefSnapshot {
+  id                    String   @id @default(uuid())
+  briefId               String
+  
+  // Snapshot of brief data at generation time
+  subjectName           String
+  unitName              String
+  unitCode              String
+  level                 Int
+  semester              String
+  learningAims          String[]
+  vocationalScenario    String   @db.Text
+  tasks                 Json
+  assessmentCriteria    Json
+  checklistOfEvidence   String[]
+  sourcesOfInformation  String[]
+  
+  // Generation settings
+  language              Language
+  includeImages         Boolean  @default(false)
+  includeTables         Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  
+  brief                 Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  assignment            Assignment?
+  
+  @@index([briefId])
+}
+
+model Assignment {
+  id                     String           @id @default(uuid())
+  language               Language
+  userId                 String
+  snapshotId             String           @unique
+  grade                  Grade
+  includeImages          Boolean          @default(false)
+  includeTables          Boolean          @default(false)
+  status                 AssignmentStatus @default(DRAFT)
+  totalTokensUsed        Int              @default(0)
+  totalAiCalls           Int              @default(0)
+  modelsUsed             String[]         @default([])
+  generationDurationMs   Int?
+  content                Json?
+  docxUrl                String?
+  error                  String?
+  createdAt              DateTime         @default(now())
+  completedAt            DateTime?
+  
+  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshot               ResolvedBriefSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  aiUsageLogs            AIUsageLog[]
+  generationPlan         GenerationPlan?
+  contentBlocks          ContentBlock[]
+  
+  @@index([userId])
+  @@index([status])
+}
+
+model AIUsageLog {
+  id                String    @id @default(uuid())
+  assignmentId      String?
+  userId            String
+  userRole          UserRole
+  aiProvider        String
+  aiModel           String
+  promptTokens      Int
+  completionTokens  Int
+  totalTokens       Int
+  purpose           String
+  createdAt         DateTime  @default(now())
+  
+  assignment        Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  
+  @@index([assignmentId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model TokenPlan {
+  id                  String         @id @default(uuid())
+  userId              String         @unique
+  planType            TokenPlanType  @default(FREE)
+  tokensPerMonth      Int            @default(5000)
+  tokensRemaining     Int            @default(5000)
+  resetAt             DateTime?
+  activatedAt         DateTime       @default(now())
+  expiresAt           DateTime?
+  
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([planType])
+}
+
+model TokenTransaction {
+  id                String    @id @default(uuid())
+  userId            String
+  assignmentId      String?
+  tokensUsed        Int
+  tokensRemaining   Int
+  purpose           String
+  createdAt         DateTime  @default(now())
+  
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model GenerationPlan {
+  id                String    @id @default(uuid())
+  assignmentId      String    @unique
+  planData          Json
+  tokensUsed        Int       @default(0)
+  createdAt         DateTime  @default(now())
+  
+  assignment        Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  
+  @@index([assignmentId])
+}
+
+model ContentBlock {
+  id                String    @id @default(uuid())
+  assignmentId      String
+  sectionId         String
+  criterionCode     String?
+  blockOrder        Int
+  content           String    @db.Text
+  tokensUsed        Int       @default(0)
+  generatedAt       DateTime  @default(now())
+  
+  assignment        Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  
+  @@index([assignmentId])
+  @@index([assignmentId, blockOrder])
+}
+
+enum IssueCategory {
+  BUG
+  FEATURE_REQUEST
+  GENERATION_ISSUE
+  DOWNLOAD_ISSUE
+  ACCOUNT_ISSUE
+  OTHER
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model Issue {
+  id                String         @id @default(uuid())
+  userId            String
+  title             String
+  description       String         @db.Text
+  category          IssueCategory
+  screenshot        String?        @db.Text
+  status            IssueStatus    @default(OPEN)
+  priority          String         @default("MEDIUM")
+  adminResponse     String?        @db.Text
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}

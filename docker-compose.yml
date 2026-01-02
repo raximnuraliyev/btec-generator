@@ -1,0 +1,142 @@
+# Docker Compose - Production Configuration
+# BTEC Generator - AI Academic Assignment Generator
+#
+# Usage:
+#   docker-compose up -d          # Start all services
+#   docker-compose down           # Stop all services
+#   docker-compose logs -f        # View logs
+
+services:
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: btec-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-btec}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-btec_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-btec_generator}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-btec} -d ${POSTGRES_DB:-btec_generator}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - btec-network
+
+  # =============================================================================
+  # Redis (Job Queue)
+  # =============================================================================
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: btec-redis
+  #   restart: unless-stopped
+  #   command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction
+  #   volumes:
+  #     - redis_data:/data
+  #   ports:
+  #     - "6379:6379"
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - btec-network
+
+  # =============================================================================
+  # Adminer (Database Admin UI)
+  # =============================================================================
+  adminer:
+    image: adminer:latest
+    container_name: btec-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - btec-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # =============================================================================
+  # Backend API Server
+  # =============================================================================
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: btec-backend
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 3001
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-btec}:${POSTGRES_PASSWORD:-btec_dev_password}@postgres:5432/${POSTGRES_DB:-btec_generator}
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     JWT_SECRET: ${JWT_SECRET}
+  #     OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+  #     DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+  #     DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+  #     DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+  #     CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+  #   ports:
+  #     - "3001:3001"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   networks:
+  #     - btec-network
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+
+  # =============================================================================
+  # Frontend (Nginx)
+  # =============================================================================
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.frontend
+  #   container_name: btec-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - btec-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  btec-network:
+    driver: bridge
