@@ -11,7 +11,9 @@ import {
   Play,
   Copy,
   Check,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Coins
 } from 'lucide-react';
 import { generationApi, JobWebSocket } from '../services/api';
 
@@ -61,8 +63,13 @@ export function MonitorPage({ assignmentId, onNavigate }: MonitorPageProps) {
   const [actionLoading, setActionLoading] = useState(false);
   const [copiedJobId, setCopiedJobId] = useState(false);
   const [assignmentNotFound, setAssignmentNotFound] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [tokensUsed, setTokensUsed] = useState<number>(0);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const wsRef = useRef<JobWebSocket | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRefreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastProgressRef = useRef<number>(0);
 
   const assignment = getAssignment(assignmentId);
 
@@ -111,85 +118,140 @@ export function MonitorPage({ assignmentId, onNavigate }: MonitorPageProps) {
     }
   }, []);
 
-  // Setup WebSocket connection
+  // Setup WebSocket connection and polling
   useEffect(() => {
-    if (!assignment?.job?.id) return;
+    if (!assignment) return;
 
-    const jobId = assignment.job.id;
-    const token = localStorage.getItem('btec_token');
-    if (!token) return;
+    // Add initial log
+    addLog('Monitoring assignment generation...');
 
-    // Initial fetch
-    fetchJobStatus(jobId);
-
-    // Setup WebSocket
-    const ws = new JobWebSocket(jobId);
-    wsRef.current = ws;
-
-    ws.onProgress((data) => {
-      setRealTimeProgress({
-        ...data,
-        stage: data.stage,
-        progress: data.progress,
-        wordCount: data.wordCount,
-      });
-      addLog(`Progress: ${data.progress}% - Stage: ${data.stage}`);
+    // Poll for updates every 3 seconds
+    const pollInterval = setInterval(async () => {
+      await fetchAssignments();
+      const updated = getAssignment(assignmentId);
       
-      // Update job state with real-time data
-      setJobState(prev => prev ? {
-        ...prev,
-        progress: data.progress,
-        currentStage: data.stage,
-        currentWordCount: data.wordCount || prev.currentWordCount,
+      if (updated) {
+        // Log status changes
+        if (updated.status !== assignment.status) {
+          addLog(`Status changed: ${updated.status}`);
+        }
+        
+        // Update local state
+        if (updated.status === 'COMPLETED') {
+          addLog('✓ Generation complete!');
+          setJobState(prev => prev ? { ...prev, status: 'COMPLETED', progress: 100 } : null);
+          clearInterval(pollInterval);
+          
+          // Auto-navigate after delay
+          setTimeout(() => {
+            onNavigate('review', assignmentId);
+          }, 2000);
+        } else if (updated.status === 'FAILED') {
+          addLog('✗ Generation failed');
+          setJobState(prev => prev ? { ...prev, status: 'FAILED' } : null);
+          clearInterval(pollInterval);
+        } else if (updated.status === 'GENERATING') {
+          // Estimate progress based on time elapsed
+          const elapsed = Date.now() - new Date(updated.createdAt).getTime();
+          const estimatedProgress = Math.min(95, Math.floor((elapsed / 120000) * 100)); // 2 min estimate
+          
+          setJobState(prev => prev ? { 
+            ...prev, 
+            status: 'PROCESSING',
+            progress: estimatedProgress,
+            currentStage: 'Generating content...'
+          } : null);
+          
+          // Only log every 10% change to avoid spam
+          if (Math.floor(estimatedProgress / 10) !== Math.floor(lastProgressRef.current / 10)) {
+            addLog(`Progress: ${estimatedProgress}% - Generating content blocks...`);
+            lastProgressRef.current = estimatedProgress;
+          }
+        }
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Initial state setup
+    if (assignment.status === 'GENERATING') {
+      setJobState({
+        id: assignment.id,
         status: 'PROCESSING',
-      } : null);
-    });
+        currentStage: 'Generating content...',
+        progress: 0,
+        currentWordCount: 0,
+        targetWordCount: 3000,
+        createdAt: assignment.createdAt,
+      });
+    } else if (assignment.status === 'COMPLETED') {
+      setJobState({
+        id: assignment.id,
+        status: 'COMPLETED',
+        currentStage: 'Completed',
+        progress: 100,
+        currentWordCount: 0,
+        targetWordCount: 3000,
+        createdAt: assignment.createdAt,
+      });
+    }
 
-    ws.onStageComplete((data) => {
-      addLog(`Stage completed: ${data.stage}`);
-      fetchJobStatus(jobId);
-    });
-
-    ws.onComplete((data) => {
-      addLog('Generation complete!');
-      setJobState(prev => prev ? { ...prev, status: 'COMPLETED', progress: 100 } : null);
-      fetchAssignments();
-      
-      // Auto-navigate after delay
-      setTimeout(() => {
-        onNavigate('review', assignmentId);
-      }, 2000);
-    });
-
-    ws.onError((data) => {
-      addLog(`Error: ${data.error}`);
-      setJobState(prev => prev ? { 
-        ...prev, 
-        status: 'FAILED', 
-        errorMessage: data.error 
-      } : null);
-    });
-
-    ws.onApprovalRequired((data) => {
-      addLog(`Approval required for stage: ${data.stage}`);
-      setIsPaused(true);
-    });
-
-    ws.connect(token);
-
-    // Polling fallback (every 5 seconds)
-    pollIntervalRef.current = setInterval(() => {
-      fetchJobStatus(jobId);
-    }, 5000);
+    setIsLoading(false);
 
     return () => {
-      ws.disconnect();
-      wsRef.current = null;
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
+      clearInterval(pollInterval);
+    };
+  }, [assignment?.id, assignment?.status, assignmentId, fetchAssignments, getAssignment, addLog, onNavigate]);
+
+  // Status helpers (defined early for use in effects)
+  const isComplete = jobState?.status === 'COMPLETED';
+  const isFailed = jobState?.status === 'FAILED';
+  const isCancelled = jobState?.status === 'CANCELLED';
+  const isTerminal = isComplete || isFailed || isCancelled;
+  const isProcessing = jobState?.status === 'PROCESSING' || jobState?.status === 'QUEUED';
+  const percentage = realTimeProgress?.progress ?? jobState?.progress ?? 0;
+
+  // Manual refresh function (defined after fetchJobStatus)
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchAssignments();
+      if (jobState?.id) {
+        await fetchJobStatus(jobState.id);
+      }
+      addLog('Status refreshed');
+    } catch (error) {
+      addLog('Failed to refresh status');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchAssignments, jobState?.id, fetchJobStatus, addLog]);
+
+  // Auto-refresh every 10 seconds
+  useEffect(() => {
+    if (!autoRefreshEnabled || isTerminal) {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+      return;
+    }
+
+    autoRefreshIntervalRef.current = setInterval(() => {
+      handleRefresh();
+    }, 10000); // 10 seconds
+
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
       }
     };
-  }, [assignment?.job?.id, fetchJobStatus, addLog, fetchAssignments, onNavigate, assignmentId]);
+  }, [autoRefreshEnabled, isTerminal, handleRefresh]);
+
+  // Update tokens used when assignment changes
+  useEffect(() => {
+    if (assignment?.totalTokensUsed) {
+      setTokensUsed(assignment.totalTokensUsed);
+    }
+  }, [assignment?.totalTokensUsed]);
 
   // Handle pause
   const handlePause = async () => {
@@ -263,14 +325,6 @@ export function MonitorPage({ assignmentId, onNavigate }: MonitorPageProps) {
     }
   };
 
-  // Status helpers
-  const isComplete = jobState?.status === 'COMPLETED';
-  const isFailed = jobState?.status === 'FAILED';
-  const isCancelled = jobState?.status === 'CANCELLED';
-  const isTerminal = isComplete || isFailed || isCancelled;
-  const isProcessing = jobState?.status === 'PROCESSING' || jobState?.status === 'QUEUED';
-  const percentage = realTimeProgress?.progress ?? jobState?.progress ?? 0;
-
   // Get status display
   const getStatusDisplay = () => {
     if (!jobState) return { text: 'Loading...', color: 'text-gray-600' };
@@ -334,15 +388,25 @@ export function MonitorPage({ assignmentId, onNavigate }: MonitorPageProps) {
       {/* Header */}
       <header className="border-b-2 border-black">
         <div className="max-w-4xl mx-auto px-6 py-4">
-          <Button
-            onClick={() => onNavigate('dashboard')}
-            variant="ghost"
-            className="mb-2 hover:bg-gray-100 flex items-center gap-2"
-            disabled={!isTerminal}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {isTerminal ? 'Back to Dashboard' : 'Generation in progress...'}
-          </Button>
+          <div className="flex items-center justify-between mb-2">
+            <Button
+              onClick={() => onNavigate('dashboard')}
+              variant="ghost"
+              className="hover:bg-gray-100 flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {isTerminal ? 'Back to Dashboard' : 'Back (Generation continues)'}
+            </Button>
+            <Button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              variant="outline"
+              className="border-2 border-black flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
           <h1 className="text-3xl" style={{ fontWeight: 700 }}>
             {assignment.title}
           </h1>
@@ -550,9 +614,15 @@ export function MonitorPage({ assignmentId, onNavigate }: MonitorPageProps) {
           {/* Completion Message */}
           {isComplete && (
             <div className="mt-6 text-center">
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-2">
                 Your assignment has been generated successfully!
               </p>
+              {tokensUsed > 0 && (
+                <div className="flex items-center justify-center gap-2 mb-4 text-sm text-gray-700">
+                  <Coins className="w-4 h-4" />
+                  <span><strong>{tokensUsed.toLocaleString()}</strong> tokens used</span>
+                </div>
+              )}
               <Button
                 onClick={() => onNavigate('review', assignmentId)}
                 className="bg-black text-white px-8 py-3 hover:bg-gray-800 border-0"
@@ -599,28 +669,38 @@ export function MonitorPage({ assignmentId, onNavigate }: MonitorPageProps) {
             </h2>
             <div className="space-y-3 text-sm text-gray-700">
               <ProcessStep 
-                title="Brief Parsing"
-                description="Extracting criteria and requirements from your assignment brief"
-                complete={['CONTENT_GENERATION', 'PASS_CONTENT', 'MERIT_CONTENT', 'DISTINCTION_CONTENT', 'HUMANIZATION', 'DOCUMENT_BUILDING', 'COMPLETED'].includes(jobState?.currentStage || '')}
-                active={jobState?.currentStage === 'BRIEF_PARSING'}
+                title="Planning Content Structure"
+                description="Analyzing unit requirements and creating content plan"
+                complete={percentage > 10}
+                active={percentage <= 10 && !isTerminal}
               />
               <ProcessStep 
-                title="Content Generation"
-                description="Creating criterion-by-criterion content (P → M → D)"
-                complete={['HUMANIZATION', 'DOCUMENT_BUILDING', 'COMPLETED'].includes(jobState?.currentStage || '')}
-                active={['CONTENT_GENERATION', 'PASS_CONTENT', 'MERIT_CONTENT', 'DISTINCTION_CONTENT'].includes(jobState?.currentStage || '')}
+                title="Generating Pass Content"
+                description="Creating P1, P2, P3... criterion content"
+                complete={percentage > 40}
+                active={percentage > 10 && percentage <= 40}
               />
+              {assignment?.targetGrade !== 'PASS' && (
+                <ProcessStep 
+                  title="Generating Merit Content"
+                  description="Creating M1, M2... criterion content with analysis"
+                  complete={percentage > 70}
+                  active={percentage > 40 && percentage <= 70}
+                />
+              )}
+              {assignment?.targetGrade === 'DISTINCTION' && (
+                <ProcessStep 
+                  title="Generating Distinction Content"
+                  description="Creating D1, D2... criterion content with evaluation"
+                  complete={percentage > 85}
+                  active={percentage > 70 && percentage <= 85}
+                />
+              )}
               <ProcessStep 
-                title="Humanization"
-                description="Adding natural student voice and structural variety"
-                complete={['DOCUMENT_BUILDING', 'COMPLETED'].includes(jobState?.currentStage || '')}
-                active={jobState?.currentStage === 'HUMANIZATION'}
-              />
-              <ProcessStep 
-                title="Document Building"
-                description="Assembling final .docx with proper formatting"
-                complete={jobState?.currentStage === 'COMPLETED'}
-                active={jobState?.currentStage === 'DOCUMENT_BUILDING'}
+                title="Building DOCX Document"
+                description="Assembling final Word document with formatting"
+                complete={isComplete}
+                active={percentage > 85 && !isComplete}
               />
             </div>
           </div>

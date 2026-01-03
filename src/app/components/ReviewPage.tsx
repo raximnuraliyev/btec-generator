@@ -43,7 +43,8 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
     }
   }, [assignment?.status, assignmentId, fetchAssignments, getAssignment]);
 
-  const canDownload = assignment?.status === 'COMPLETED' && assignment?.docxUrl;
+  // Allow download as soon as status is COMPLETED - backend will generate DOCX if needed
+  const canDownload = assignment?.status === 'COMPLETED';
 
   const handleExportClick = async () => {
     if (!canDownload) {
@@ -182,7 +183,8 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
         <div className="mb-8">
           <WritingGuidance 
             grade={assignment.targetGrade} 
-            level={assignment.level} 
+            level={assignment.level}
+            assignment={assignment}
           />
         </div>
 

@@ -384,15 +384,7 @@ export const getUserAssignments = async (userId: string) => {
   const assignments = await prisma.assignment.findMany({
     where: { userId },
     include: {
-      snapshot: {
-        select: {
-          id: true,
-          unitName: true,
-          unitCode: true,
-          subjectName: true,
-          level: true,
-        },
-      },
+      snapshot: true, // Include all snapshot fields including assessmentCriteria and learningAims
     },
     orderBy: {
       createdAt: 'desc',

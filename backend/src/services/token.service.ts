@@ -57,6 +57,26 @@ export async function deductTokens(
   assignmentId: string | null,
   purpose: string
 ) {
+  // Check user role first - VIP and ADMIN have infinite tokens
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+
+  if (user && (user.role === 'VIP' || user.role === 'ADMIN')) {
+    console.log(`[TOKEN] Skipping deduction for ${user.role} user`);
+    await prisma.tokenTransaction.create({
+      data: {
+        userId,
+        assignmentId,
+        tokensUsed,
+        tokensRemaining: -1, // Infinite
+        purpose,
+      },
+    });
+    return;
+  }
+
   const plan = await prisma.tokenPlan.findUnique({
     where: { userId },
   });

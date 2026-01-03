@@ -179,26 +179,96 @@ export const download = async (
       return;
     }
 
-    // Generate DOCX if not already generated
-    if (!assignment.docxUrl) {
-      const content = assignment.content as GeneratedContent;
-      const docxUrl = await generateDocx(
-        assignment.id,
-        content,
-        assignment.snapshot.unitName,
-        assignment.snapshot.unitCode
-      );
+    // DOCX should already be generated, but regenerate if missing
+    let docxPath = assignment.docxUrl;
+    
+    if (!docxPath) {
+      console.log('[DOWNLOAD] No DOCX path found, attempting to generate now...');
+      
+      try {
+        const content = assignment.content as GeneratedContent;
+        const unitName = assignment.snapshot?.unitName || 'Assignment';
+        const unitCode = assignment.snapshot?.unitCode || 'N/A';
+        
+        console.log('[DOWNLOAD] Generating DOCX with content structure:', {
+          hasIntroduction: !!content.introduction,
+          sectionsCount: content.sections?.length || 0,
+          hasConclusion: !!content.conclusion,
+          referencesCount: content.references?.length || 0
+        });
+        
+        docxPath = await generateDocx(
+          assignment.id,
+          content,
+          unitName,
+          unitCode
+        );
+        
+        if (!docxPath) {
+          throw new Error('generateDocx returned undefined');
+        }
+        
+        console.log('[DOWNLOAD] DOCX generated successfully:', docxPath);
+        
+        // Save the path for future downloads
+        await prisma.assignment.update({
+          where: { id: assignment.id },
+          data: { docxUrl: docxPath }
+        });
+      } catch (genError: any) {
+        console.error('[DOWNLOAD] Failed to generate DOCX:', genError?.message);
+        console.error('[DOWNLOAD] Error stack:', genError?.stack);
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: `Failed to generate document: ${genError?.message || 'Unknown error'}`,
+        } as APIError);
+        return;
+      }
+    }
 
-      await prisma.assignment.update({
-        where: { id: assignment.id },
-        data: { docxUrl },
-      });
-
-      res.status(200).json({ downloadUrl: docxUrl });
+    // Stream the file to the client
+    const fs = await import('fs');
+    const path = await import('path');
+    
+    console.log('[DOWNLOAD] docxPath:', docxPath);
+    
+    // docxPath is already an absolute path from generateDocx
+    const fullPath = docxPath;
+    
+    console.log('[DOWNLOAD] fullPath:', fullPath);
+    
+    // Check if file exists
+    if (!fs.existsSync(fullPath)) {
+      console.error('[DOWNLOAD] File not found at path:', fullPath);
+      res.status(404).json({
+        error: 'Not Found',
+        message: 'Assignment file not found',
+      } as APIError);
       return;
     }
 
-    res.status(200).json({ downloadUrl: assignment.docxUrl });
+    // Set headers for file download with null safety
+    const unitName = assignment.snapshot?.unitName || 'Assignment';
+    const unitCode = assignment.snapshot?.unitCode || assignment.id.slice(0, 8);
+    const fileName = `Assignment_${unitName}_${unitCode}.docx`;
+    
+    console.log('[DOWNLOAD] Streaming file:', fileName);
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    
+    // Stream the file with error handling
+    const fileStream = fs.createReadStream(fullPath);
+    fileStream.on('error', (err) => {
+      console.error('[DOWNLOAD] Stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: 'Failed to stream file',
+        } as APIError);
+      }
+    });
+    fileStream.pipe(res);
   } catch (error) {
     if (error instanceof Error) {
       if (

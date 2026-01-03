@@ -101,7 +101,12 @@ export const getUserDetails = async (userId: string) => {
     throw new Error('User not found');
   }
 
-  return user;
+  // Ensure assignments is always an array
+  return {
+    ...user,
+    assignments: user.assignments || [],
+    userFlags: user.userFlags || [],
+  };
 };
 
 export const updateUserRole = async (userId: string, role: UserRole) => {
@@ -246,26 +251,48 @@ export const downloadAnyAssignment = async (assignmentId: string) => {
   return assignment;
 };
 
-export const logAIUsage = async (data: {
-  assignmentId: string;
-  userId: string;
-  userRole: string;
-  aiProvider: string;
-  aiModel: string;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  responseTimeMs: number;
-  endpoint: string;
-}) => {
-  // For now, just log to console - can be extended to database logging later
-  console.log('[AI USAGE]', {
-    assignment: data.assignmentId,
-    model: data.aiModel,
-    tokens: data.totalTokens,
-    time: data.responseTimeMs
-  });
+export const logAIUsage = async (
+  dataOrAssignmentId: {
+    assignmentId: string;
+    userId?: string;
+    userRole?: string;
+    aiProvider?: string;
+    aiModel: string;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    responseTimeMs?: number;
+    endpoint?: string;
+    purpose?: string;
+  } | string,
+  purpose?: string,
+  model?: string,
+  tokenData?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }
+) => {
+  // Support both object and positional argument patterns
+  let logData: any;
   
-  // Could add database logging here if needed:
-  // await prisma.aiUsageLog.create({ data });
+  if (typeof dataOrAssignmentId === 'string') {
+    // Positional arguments pattern (legacy)
+    logData = {
+      assignment: dataOrAssignmentId,
+      purpose: purpose,
+      model: model,
+      tokens: tokenData?.totalTokens,
+    };
+  } else {
+    // Object pattern
+    logData = {
+      assignment: dataOrAssignmentId.assignmentId,
+      model: dataOrAssignmentId.aiModel,
+      tokens: dataOrAssignmentId.totalTokens,
+      purpose: dataOrAssignmentId.purpose,
+    };
+  }
+  
+  console.log('[AI USAGE]', logData);
 };

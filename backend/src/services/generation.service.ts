@@ -1,7 +1,44 @@
 import { prisma } from '../lib/prisma';
 import { generatePlan } from './planner.service';
-import { generateAllBlocks } from './writer.service';
+import { generateContentBlock, generateIntroduction, generateLearningAimContent, generateConclusion, generateReferences } from './writer.service';
 import { deductTokens } from './token.service';
+import { generateDocx } from './docx.service';
+import { generateWritingGuidance } from './guidance.service';
+import { GeneratedContent, ContentSection, Reference } from '../types';
+
+/**
+ * CANONICAL ASSIGNMENT GENERATION FLOW
+ * 
+ * PHASE 0 - INPUTS (STRICT)
+ * - Published Brief
+ * - ResolvedBriefSnapshot (immutable)
+ * - User-selected: Language, Target Grade, Include Tables, Include Images
+ * 
+ * PHASE 1 - PLANNING (NO CONTENT)
+ * - Generate generation blueprint
+ * - Map criteria to learning aims
+ * 
+ * PHASE 2 - INTRODUCTION
+ * - 1 AI call, 120-180 words
+ * - Explain unit topic, reference scenario, mention learning aims
+ * 
+ * PHASE 3 - LEARNING AIM LOOP
+ * - For each Learning Aim:
+ *   - Generate aim context block
+ *   - Generate each criterion ONE BY ONE
+ *   - Insert tables if required
+ *   - Insert image placeholders if enabled
+ * 
+ * PHASE 4 - CONCLUSION
+ * - 1 AI call, 120-180 words
+ * - Summarize achievements
+ * 
+ * PHASE 5 - REFERENCES
+ * - Generate 3-10 references based on grade
+ * 
+ * PHASE 6 - DOCX ASSEMBLY
+ * - No AI, just formatting
+ */
 
 export async function startGeneration(assignmentId: string, userId: string) {
   // Get assignment with snapshot
@@ -33,15 +70,25 @@ export async function startGeneration(assignmentId: string, userId: string) {
 
   try {
     const startTime = Date.now();
+    const assessmentCriteria = assignment.snapshot.assessmentCriteria as any;
 
-    // Build brief snapshot for AI
+    // PHASE 0: VALIDATE INPUTS
+    console.log(`[ORCHESTRATOR] ========================================`);
+    console.log(`[ORCHESTRATOR] PHASE 0: Validating inputs`);
+    console.log(`[ORCHESTRATOR] ========================================`);
+
+    // Build brief snapshot for AI with properly structured criteria
     const briefSnapshot = {
       unitName: assignment.snapshot.unitName,
       unitCode: assignment.snapshot.unitCode,
       level: assignment.snapshot.level,
       scenario: assignment.snapshot.vocationalScenario,
-      learningAims: assignment.snapshot.learningAims,
-      assessmentCriteria: assignment.snapshot.assessmentCriteria,
+      learningAims: assignment.snapshot.learningAims as any[],
+      assessmentCriteria: {
+        pass: normalizeCriteria(assessmentCriteria?.pass, 'P'),
+        merit: normalizeCriteria(assessmentCriteria?.merit, 'M'),
+        distinction: normalizeCriteria(assessmentCriteria?.distinction, 'D'),
+      },
       checklistOfEvidence: assignment.snapshot.checklistOfEvidence || [],
       sources: assignment.snapshot.sourcesOfInformation || [],
       targetGrade: assignment.grade,
@@ -52,32 +99,37 @@ export async function startGeneration(assignmentId: string, userId: string) {
       },
     };
 
-    console.log(`[ORCHESTRATOR] Starting generation for assignment ${assignmentId}`);
+    console.log(`[ORCHESTRATOR] Target Grade: ${briefSnapshot.targetGrade}`);
+    console.log(`[ORCHESTRATOR] Language: ${briefSnapshot.language}`);
+    console.log(`[ORCHESTRATOR] Pass Criteria: ${briefSnapshot.assessmentCriteria.pass.length}`);
+    console.log(`[ORCHESTRATOR] Merit Criteria: ${briefSnapshot.assessmentCriteria.merit.length}`);
+    console.log(`[ORCHESTRATOR] Distinction Criteria: ${briefSnapshot.assessmentCriteria.distinction.length}`);
 
-    // Step 1: Generate plan
-    console.log('[ORCHESTRATOR] Step 1: Generating plan...');
+    // PHASE 1: PLANNING
+    console.log(`[ORCHESTRATOR] ========================================`);
+    console.log(`[ORCHESTRATOR] PHASE 1: Generating plan (NO CONTENT)`);
+    console.log(`[ORCHESTRATOR] ========================================`);
     const generationPlan = await generatePlan(briefSnapshot, userId, assignmentId);
+    console.log(`[ORCHESTRATOR] Plan sections: ${generationPlan.sections?.length || 0}`);
 
-    // Step 2: Generate all content blocks
-    console.log('[ORCHESTRATOR] Step 2: Generating content blocks...');
-    await generateAllBlocks(briefSnapshot, generationPlan, userId, assignmentId);
+    // PHASE 2-5: CONTENT GENERATION (phased approach)
+    console.log(`[ORCHESTRATOR] ========================================`);
+    console.log(`[ORCHESTRATOR] PHASES 2-5: Phased Content Generation`);
+    console.log(`[ORCHESTRATOR] ========================================`);
+    
+    // Generate content using the new phase-based approach
+    const generatedContent = await generatePhasedContent(
+      briefSnapshot,
+      generationPlan,
+      userId,
+      assignmentId
+    );
 
-    // Step 3: Assemble content from blocks
-    console.log('[ORCHESTRATOR] Step 3: Assembling content...');
+    // Get all blocks for token counting
     const blocks = await prisma.contentBlock.findMany({
       where: { assignmentId },
       orderBy: { blockOrder: 'asc' },
     });
-
-    const assembledContent = {
-      sections: blocks.map((block) => ({
-        id: block.sectionId,
-        criterionCode: block.criterionCode,
-        content: block.content,
-        tokensUsed: block.tokensUsed,
-      })),
-      totalBlocks: blocks.length,
-    };
 
     // Calculate total tokens
     const totalTokens = blocks.reduce((sum, block) => sum + block.tokensUsed, 0);
@@ -88,22 +140,83 @@ export async function startGeneration(assignmentId: string, userId: string) {
     const endTime = Date.now();
     const durationMs = endTime - startTime;
 
+    // PHASE 6: DOCX ASSEMBLY (NO AI)
+    console.log(`[ORCHESTRATOR] ========================================`);
+    console.log(`[ORCHESTRATOR] PHASE 6: DOCX Assembly (NO AI)`);
+    console.log(`[ORCHESTRATOR] ========================================`);
+    console.log('[ORCHESTRATOR] Content structure:', {
+      hasIntroduction: !!generatedContent.introduction,
+      sectionsCount: generatedContent.sections?.length || 0,
+      hasConclusion: !!generatedContent.conclusion,
+      referencesCount: generatedContent.references?.length || 0
+    });
+    
+    const unitName = assignment.snapshot?.unitName || 'Assignment';
+    const unitCode = assignment.snapshot?.unitCode || 'N/A';
+    
+    let docxPath: string | undefined;
+    try {
+      docxPath = await generateDocx(
+        assignmentId,
+        generatedContent,
+        unitName,
+        unitCode
+      );
+      if (!docxPath) {
+        throw new Error('generateDocx returned undefined');
+      }
+      console.log('[ORCHESTRATOR] ✓ DOCX generated successfully:', docxPath);
+    } catch (docxError: any) {
+      console.error('[ORCHESTRATOR] ✗ CRITICAL: Failed to generate DOCX');
+      console.error('[ORCHESTRATOR] Error message:', docxError?.message);
+      console.error('[ORCHESTRATOR] Error stack:', docxError?.stack);
+      docxPath = undefined;
+    }
+
+    // Generate Writing Guidance
+    console.log('[ORCHESTRATOR] Generating writing guidance...');
+    let writingGuidance: any = null;
+    try {
+      writingGuidance = await generateWritingGuidance(
+        {
+          unitName: assignment.snapshot.unitName,
+          unitCode: assignment.snapshot.unitCode,
+          level: assignment.snapshot.level,
+          learningAims: (assignment.snapshot.learningAims as any) || [],
+          passCriteria: briefSnapshot.assessmentCriteria.pass,
+          meritCriteria: briefSnapshot.assessmentCriteria.merit,
+          distinctionCriteria: briefSnapshot.assessmentCriteria.distinction,
+          vocationalScenario: assignment.snapshot.vocationalScenario || '',
+          targetGrade: assignment.grade,
+          language: assignment.language,
+        },
+        assignmentId
+      );
+      console.log('[ORCHESTRATOR] ✓ Writing guidance generated successfully');
+    } catch (guidanceError: any) {
+      console.error('[ORCHESTRATOR] ✗ Failed to generate writing guidance');
+      console.error('[ORCHESTRATOR] Guidance error:', guidanceError?.message);
+    }
+
     // Update assignment as completed
     await prisma.assignment.update({
       where: { id: assignmentId },
       data: {
         status: 'COMPLETED',
-        content: assembledContent as any,
+        content: generatedContent as any,
+        guidance: writingGuidance as any,
         totalTokensUsed: totalTokens,
-        totalAiCalls: blocks.length + 1, // +1 for planner
+        totalAiCalls: blocks.length + 1,
         generationDurationMs: durationMs,
         completedAt: new Date(),
+        docxUrl: docxPath,
       },
     });
 
-    console.log(
-      `[ORCHESTRATOR] Generation completed in ${durationMs}ms, ${totalTokens} tokens used`
-    );
+    console.log(`[ORCHESTRATOR] ========================================`);
+    console.log(`[ORCHESTRATOR] Generation completed in ${durationMs}ms`);
+    console.log(`[ORCHESTRATOR] Total tokens: ${totalTokens}`);
+    console.log(`[ORCHESTRATOR] ========================================`);
 
     return {
       success: true,
@@ -115,7 +228,6 @@ export async function startGeneration(assignmentId: string, userId: string) {
   } catch (error: any) {
     console.error('[ORCHESTRATOR] Generation failed:', error);
 
-    // Update assignment as failed
     await prisma.assignment.update({
       where: { id: assignmentId },
       data: {
@@ -126,6 +238,198 @@ export async function startGeneration(assignmentId: string, userId: string) {
 
     throw error;
   }
+}
+
+/**
+ * Normalize criteria array - handle both string[] and object[] formats
+ */
+function normalizeCriteria(criteria: any, prefix: string): Array<{ code: string; description: string }> {
+  if (!Array.isArray(criteria)) return [];
+  
+  return criteria.map((item: any, idx: number) => {
+    if (typeof item === 'string') {
+      return { code: `${prefix}${idx + 1}`, description: item };
+    }
+    return {
+      code: item.code || `${prefix}${idx + 1}`,
+      description: item.description || item.text || String(item)
+    };
+  });
+}
+
+/**
+ * PHASED CONTENT GENERATION
+ * Generates content following strict phase boundaries
+ */
+async function generatePhasedContent(
+  briefSnapshot: any,
+  generationPlan: any,
+  userId: string,
+  assignmentId: string
+): Promise<GeneratedContent> {
+  let blockOrder = 0;
+  let previousSummary = '';
+
+  // Determine which criteria to include based on target grade
+  const targetGrade = briefSnapshot.targetGrade;
+  let criteriaToGenerate: any[] = [...briefSnapshot.assessmentCriteria.pass];
+  
+  if (targetGrade === 'MERIT' || targetGrade === 'DISTINCTION') {
+    criteriaToGenerate = [...criteriaToGenerate, ...briefSnapshot.assessmentCriteria.merit];
+  }
+  
+  if (targetGrade === 'DISTINCTION') {
+    criteriaToGenerate = [...criteriaToGenerate, ...briefSnapshot.assessmentCriteria.distinction];
+  }
+
+  console.log(`[GENERATION] Criteria to generate for ${targetGrade}: ${criteriaToGenerate.length}`);
+
+  // PHASE 2: INTRODUCTION
+  console.log(`[GENERATION] PHASE 2: Introduction (120-180 words)`);
+  const introductionContent = await generateIntroduction(
+    briefSnapshot,
+    generationPlan,
+    userId,
+    assignmentId,
+    blockOrder++
+  );
+  previousSummary = introductionContent.substring(0, 200);
+
+  // PHASE 3: LEARNING AIM SECTIONS
+  console.log(`[GENERATION] PHASE 3: Learning Aim Sections`);
+  const sections: ContentSection[] = [];
+
+  for (const section of (generationPlan.sections || [])) {
+    console.log(`[GENERATION] Processing section: ${section.title}`);
+    
+    // Generate aim context block
+    const aimContextContent = await generateLearningAimContent(
+      briefSnapshot,
+      generationPlan,
+      section,
+      previousSummary,
+      userId,
+      assignmentId,
+      blockOrder++
+    );
+    previousSummary = aimContextContent.substring(0, 200);
+
+    // Build section content starting with aim context
+    let sectionContent = aimContextContent;
+    const sectionTables: any[] = [];
+    const sectionImages: any[] = [];
+
+    // Generate each criterion ONE BY ONE
+    for (const criterionCode of (section.coversCriteria || [])) {
+      const criterion = findCriterion(briefSnapshot.assessmentCriteria, criterionCode);
+      if (!criterion) {
+        console.warn(`[GENERATION] Criterion ${criterionCode} not found, skipping`);
+        continue;
+      }
+
+      console.log(`[GENERATION] Generating criterion: ${criterionCode}`);
+      
+      const criterionContent = await generateContentBlock(
+        briefSnapshot,
+        generationPlan,
+        {
+          sectionId: section.id,
+          criterionCode: criterion.code,
+          criterionDescription: criterion.description,
+          previousContentSummary: previousSummary,
+        },
+        userId,
+        assignmentId,
+        blockOrder++
+      );
+      
+      sectionContent += `\n\n${criterionContent}`;
+      previousSummary = criterionContent.substring(0, 200);
+    }
+
+    // Add tables if required (CONDITIONAL)
+    if (briefSnapshot.options.includeTables && generationPlan.tables) {
+      const sectionTableDefs = generationPlan.tables.filter(
+        (t: any) => t.placementAfterSectionId === section.id
+      );
+      
+      for (const tableDef of sectionTableDefs) {
+        sectionTables.push({
+          caption: tableDef.title,
+          headers: ['Feature', 'Description', 'Application'],
+          rows: [
+            ['Example 1', 'Description of feature', 'How it applies to scenario'],
+            ['Example 2', 'Description of feature', 'How it applies to scenario'],
+          ]
+        });
+      }
+    }
+
+    // Add image placeholders if enabled (CONDITIONAL)
+    if (briefSnapshot.options.includeImages && generationPlan.images) {
+      const sectionImageDefs = generationPlan.images.filter(
+        (i: any) => i.placementAfterSectionId === section.id
+      );
+      
+      for (const imageDef of sectionImageDefs) {
+        sectionImages.push({
+          description: imageDef.caption
+        });
+      }
+    }
+
+    sections.push({
+      heading: section.title,
+      content: sectionContent,
+      tables: sectionTables.length > 0 ? sectionTables : undefined,
+      images: sectionImages.length > 0 ? sectionImages : undefined,
+    });
+  }
+
+  // PHASE 4: CONCLUSION
+  console.log(`[GENERATION] PHASE 4: Conclusion (120-180 words)`);
+  const conclusionContent = await generateConclusion(
+    briefSnapshot,
+    generationPlan,
+    previousSummary,
+    userId,
+    assignmentId,
+    blockOrder++
+  );
+
+  // PHASE 5: REFERENCES
+  console.log(`[GENERATION] PHASE 5: References (Oxford style)`);
+  const references = await generateReferences(
+    briefSnapshot,
+    targetGrade,
+    userId,
+    assignmentId,
+    blockOrder++
+  );
+
+  return {
+    introduction: introductionContent,
+    sections,
+    conclusion: conclusionContent,
+    references,
+  };
+}
+
+/**
+ * Find criterion by code across all grade levels
+ */
+function findCriterion(assessmentCriteria: any, code: string): any {
+  const allCriteria = [
+    ...(assessmentCriteria.pass || []),
+    ...(assessmentCriteria.merit || []),
+    ...(assessmentCriteria.distinction || []),
+  ];
+
+  return allCriteria.find((c: any) => 
+    c.code === code || 
+    c.code?.toUpperCase() === code?.toUpperCase() ||
+    c.code?.replace(/\./g, '') === code?.replace(/\./g, '')
+  );
 }
 
 export async function getGenerationStatus(assignmentId: string, userId: string) {

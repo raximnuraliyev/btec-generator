@@ -190,6 +190,7 @@ model Assignment {
   modelsUsed             String[]         @default([])
   generationDurationMs   Int?
   content                Json?
+  guidance               Json?            // Writing guidance (instructional, separate from content)
   docxUrl                String?
   error                  String?
   createdAt              DateTime         @default(now())

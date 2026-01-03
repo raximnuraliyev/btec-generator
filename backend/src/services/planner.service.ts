@@ -79,57 +79,66 @@ You MUST:
 - Use ONLY the data provided
 - Output STRICT JSON in the required schema
 - Be deterministic and reproducible
+- Use criterion codes EXACTLY as provided in the input (e.g., P1, M1, D1)
 
 PLANNING RULES (CRITICAL):
 1. Every criterion MUST be covered exactly once
 2. Only include criteria allowed by targetGrade:
-   - PASS → only pass criteria
-   - MERIT → pass + merit
-   - DISTINCTION → pass + merit + distinction
+   - PASS → only pass criteria (P1, P2, etc.)
+   - MERIT → pass + merit (P1, P2, M1, M2, etc.)
+   - DISTINCTION → pass + merit + distinction (P1, P2, M1, M2, D1, D2, etc.)
 3. Do NOT merge unrelated criteria
-4. Keep academic flow: introduction → aims → evaluation → conclusion
+4. Keep academic flow: introduction → learning aims → conclusion
 5. Tables and images must be tied to specific aims or criteria
-6. Do NOT invent new section names outside academic norms
+6. Create one section per learning aim
+7. Map criteria to their learning aims correctly
 
 OUTPUT FORMAT (STRICT):
 You MUST output a single JSON object matching this schema exactly:
 
 {
   "introduction": {
-    "covers": [],
+    "covers": ["unit overview", "scenario context"],
     "notes": "Purpose of introduction"
   },
   "sections": [
     {
-      "id": "A1",
-      "title": "Learning Aim A – Computational Thinking Skills",
+      "id": "A",
+      "title": "Learning Aim A – [Title from brief]",
       "learningAim": "A",
-      "coversCriteria": ["A.P1", "A.P2"],
+      "coversCriteria": ["P1", "P2", "M1"],
+      "generationOrder": 1
+    },
+    {
+      "id": "B",
+      "title": "Learning Aim B – [Title from brief]",
+      "learningAim": "B",
+      "coversCriteria": ["P3", "M2", "D1"],
       "generationOrder": 2
     }
   ],
   "tables": [
     {
       "id": "T1",
-      "title": "Comparison of Programming Paradigms",
-      "relatedTo": ["A.P2"],
-      "placementAfterSectionId": "A1"
+      "title": "Comparison table title",
+      "relatedTo": ["P2"],
+      "placementAfterSectionId": "A"
     }
   ],
   "images": [
     {
       "id": "I1",
-      "caption": "System flow diagram for problem solving",
-      "relatedTo": ["A.P1"],
-      "placementAfterSectionId": "A1"
+      "caption": "Figure description",
+      "relatedTo": ["P1"],
+      "placementAfterSectionId": "A"
     }
   ],
   "conclusion": {
-    "covers": [],
+    "covers": ["summary", "reflection"],
     "generationOrder": 999
   },
   "references": {
-    "requiredCount": 0
+    "requiredCount": 5
   }
 }
 

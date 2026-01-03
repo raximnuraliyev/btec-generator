@@ -271,6 +271,26 @@ export const assignmentsApi = {
     api.delete<{ message: string }>(`/assignments/${id}`),
 
   /**
+   * Download completed assignment as DOCX
+   */
+  download: async (id: string): Promise<ArrayBuffer> => {
+    const token = localStorage.getItem('btec_token');
+    const response = await fetch(`${API_BASE_URL}/assignments/${id}/download`, {
+      method: 'GET',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to download assignment' }));
+      throw new Error(error.message || 'Failed to download assignment');
+    }
+
+    return response.arrayBuffer();
+  },
+
+  /**
    * Generate a new assignment from a brief
    */
   generate: async (data: {

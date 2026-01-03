@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth';
 import { UserRole } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import {
   getDashboardStats,
   getAllUsers,
@@ -360,8 +361,7 @@ export const restartAssignment = async (
       where: { id },
       data: { 
         status: 'GENERATING',
-        error: null,
-        updatedAt: new Date()
+        error: null
       }
     });
     
