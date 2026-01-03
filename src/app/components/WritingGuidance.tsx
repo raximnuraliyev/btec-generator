@@ -13,42 +13,12 @@ import {
   Lock,
   Unlock
 } from 'lucide-react';
-
-interface OverviewGuidance {
-  whatThisIsAbout: string;
-  whatAssessorLooksFor: string[];
-  howToStructure: string;
-  howToReachGrade: string;
-}
-
-interface CriterionGuidance {
-  criterionCode: string;
-  criterionGoal: string;
-  whatToInclude: string[];
-  howToApproach: string;
-  commonMistakes: string[];
-  gradeDepthReminder: string;
-}
-
-interface WritingGuidanceData {
-  overview: OverviewGuidance;
-  criteriaGuidance: CriterionGuidance[];
-}
-
-interface Assignment {
-  id: string;
-  title: string;
-  level: number;
-  targetGrade: string;
-  status: string;
-  content?: any;
-  guidance?: WritingGuidanceData;
-  totalTokensUsed?: number;
-  snapshot?: {
-    unitName?: string;
-    unitCode?: string;
-  };
-}
+import { 
+  Assignment, 
+  WritingGuidanceData, 
+  OverviewGuidance, 
+  CriterionGuidance 
+} from '../types';
 
 interface WritingGuidanceProps {
   grade: 'PASS' | 'MERIT' | 'DISTINCTION';

@@ -156,6 +156,8 @@ export function AssignmentProvider({ children }: { children: ReactNode }) {
           createdAt: new Date(a.createdAt),
           updatedAt: new Date(a.updatedAt),
           wordCount: 0,
+          guidance: a.guidance || undefined, // Include writing guidance
+          content: a.content || undefined, // Include generated content
           // Include job data if available (cast to any to avoid circular type dependency)
           job: a.currentJob ? {
             id: a.currentJob.id,

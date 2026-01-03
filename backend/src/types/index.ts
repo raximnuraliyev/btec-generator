@@ -28,9 +28,15 @@ export interface Reference {
   order: number;
 }
 
+export interface CriterionBlock {
+  code: string;
+  content: string;
+}
+
 export interface ContentSection {
   heading: string;
   content: string;
+  criteria?: CriterionBlock[];
   tables?: TableData[];
   images?: ImagePlaceholder[];
 }

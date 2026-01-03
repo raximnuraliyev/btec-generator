@@ -273,26 +273,68 @@ export const logAIUsage = async (
     totalTokens: number;
   }
 ) => {
-  // Support both object and positional argument patterns
-  let logData: any;
-  
-  if (typeof dataOrAssignmentId === 'string') {
-    // Positional arguments pattern (legacy)
-    logData = {
-      assignment: dataOrAssignmentId,
-      purpose: purpose,
-      model: model,
-      tokens: tokenData?.totalTokens,
-    };
-  } else {
-    // Object pattern
-    logData = {
-      assignment: dataOrAssignmentId.assignmentId,
-      model: dataOrAssignmentId.aiModel,
-      tokens: dataOrAssignmentId.totalTokens,
-      purpose: dataOrAssignmentId.purpose,
-    };
+  try {
+    let logData: any;
+    
+    if (typeof dataOrAssignmentId === 'string') {
+      // Positional arguments pattern (legacy)
+      logData = {
+        assignmentId: dataOrAssignmentId,
+        purpose: purpose || 'UNKNOWN',
+        aiModel: model || 'unknown',
+        aiProvider: 'openrouter',
+        promptTokens: tokenData?.promptTokens || 0,
+        completionTokens: tokenData?.completionTokens || 0,
+        totalTokens: tokenData?.totalTokens || 0,
+      };
+    } else {
+      // Object pattern
+      logData = {
+        assignmentId: dataOrAssignmentId.assignmentId,
+        aiModel: dataOrAssignmentId.aiModel,
+        aiProvider: dataOrAssignmentId.aiProvider || 'openrouter',
+        promptTokens: dataOrAssignmentId.promptTokens || 0,
+        completionTokens: dataOrAssignmentId.completionTokens || 0,
+        totalTokens: dataOrAssignmentId.totalTokens || 0,
+        purpose: dataOrAssignmentId.purpose || 'UNKNOWN',
+        userId: dataOrAssignmentId.userId,
+        userRole: dataOrAssignmentId.userRole,
+      };
+    }
+    
+    console.log('[AI USAGE]', {
+      assignment: logData.assignmentId,
+      model: logData.aiModel,
+      tokens: logData.totalTokens,
+      purpose: logData.purpose,
+    });
+
+    // Save to database if we have assignment info
+    if (logData.assignmentId) {
+      // Get assignment to find user info
+      const assignment = await prisma.assignment.findUnique({
+        where: { id: logData.assignmentId },
+        select: { userId: true, user: { select: { role: true } } }
+      });
+      
+      if (assignment) {
+        await prisma.aIUsageLog.create({
+          data: {
+            assignmentId: logData.assignmentId,
+            userId: logData.userId || assignment.userId,
+            userRole: logData.userRole || assignment.user.role,
+            aiProvider: logData.aiProvider,
+            aiModel: logData.aiModel,
+            promptTokens: logData.promptTokens,
+            completionTokens: logData.completionTokens,
+            totalTokens: logData.totalTokens,
+            purpose: logData.purpose,
+          }
+        });
+      }
+    }
+  } catch (error) {
+    // Don't fail generation if logging fails
+    console.error('[AI USAGE] Failed to log:', error);
   }
-  
-  console.log('[AI USAGE]', logData);
 };

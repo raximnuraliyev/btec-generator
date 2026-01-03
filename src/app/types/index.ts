@@ -64,6 +64,28 @@ export interface GradeRequirements {
 
 export type AssignmentStatus = 'DRAFT' | 'GENERATING' | 'HUMANIZING' | 'COMPLETED' | 'FAILED';
 
+// Guidance types
+export interface OverviewGuidance {
+  whatThisIsAbout: string;
+  whatAssessorLooksFor: string[];
+  howToStructure: string;
+  howToReachGrade: string;
+}
+
+export interface CriterionGuidance {
+  criterionCode: string;
+  criterionGoal: string;
+  whatToInclude: string[];
+  howToApproach: string;
+  commonMistakes: string[];
+  gradeDepthReminder: string;
+}
+
+export interface WritingGuidanceData {
+  overview: OverviewGuidance;
+  criteriaGuidance: CriterionGuidance[];
+}
+
 export interface Assignment {
   id: string;
   userId: string;
@@ -78,6 +100,8 @@ export interface Assignment {
   updatedAt: Date;
   wordCount?: number;
   job?: GenerationJob;
+  guidance?: WritingGuidanceData; // Writing guidance from backend
+  content?: any; // Generated content
 }
 
 export interface CreateAssignmentData {

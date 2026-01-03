@@ -165,10 +165,14 @@ STRICT INSTRUCTIONS:
 - Maintain continuity with previous content
 - Apply concepts to the vocational scenario
 - Do NOT mention criterion codes in the text
+- UNIQUE VARIATION: This content must be unique. Vary your wording, examples, and explanations from any previous generations. (Session: ${assignmentId.slice(-8)}, Block: ${blockOrder})
 
 Write the content now. Output ONLY the academic text.`;
 
   console.log(`[WRITER] Generating block ${blockOrder} for assignment ${assignmentId}`);
+
+  // Use higher temperature and unique seed for variety
+  const uniqueSeed = parseInt(assignmentId.slice(-8), 16) + blockOrder;
 
   const completion = await openrouter.chat.completions.create({
     model: WRITER_MODEL,
@@ -176,8 +180,9 @@ Write the content now. Output ONLY the academic text.`;
       { role: 'system', content: WRITER_SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
     ],
-    temperature: 0.7,
+    temperature: 0.85, // Higher temperature for more variation
     max_tokens: 2000,
+    seed: uniqueSeed, // Use unique seed for randomization
   });
 
   const content = completion.choices[0].message.content;
@@ -343,6 +348,7 @@ STRICT REQUIREMENTS:
 - Write in ${language}
 - Formal academic tone
 - First-line indent paragraphs
+- UNIQUE VARIATION: Create a unique introduction with varied wording and structure from any previous generations. (Session: ${assignmentId.slice(-8)})
 
 ${languageInstructions}
 
@@ -350,14 +356,18 @@ Write the introduction now. Output ONLY the introduction text, nothing else.`;
 
   console.log('[WRITER] Generating introduction...');
 
+  // Use unique seed for variety
+  const uniqueSeed = parseInt(assignmentId.slice(-8), 16) + blockOrder;
+
   const completion = await openrouter.chat.completions.create({
     model: WRITER_MODEL,
     messages: [
       { role: 'system', content: WRITER_SYSTEM_PROMPT },
       { role: 'user', content: prompt },
     ],
-    temperature: 0.7,
+    temperature: 0.85, // Higher temperature for uniqueness
     max_tokens: 500,
+    seed: uniqueSeed,
   });
 
   const content = completion.choices[0].message.content || '';
@@ -427,6 +437,7 @@ STRICT REQUIREMENTS:
 - NO headings
 - Write in ${language}
 - Formal academic tone
+- UNIQUE VARIATION: Create unique context with varied wording. (Session: ${assignmentId.slice(-8)}, Block: ${blockOrder})
 
 ${languageInstructions}
 
@@ -434,14 +445,18 @@ Write the learning aim context now. Output ONLY the context text, nothing else.`
 
   console.log(`[WRITER] Generating learning aim context for: ${section.title}`);
 
+  // Use unique seed for variety
+  const uniqueSeed = parseInt(assignmentId.slice(-8), 16) + blockOrder;
+
   const completion = await openrouter.chat.completions.create({
     model: WRITER_MODEL,
     messages: [
       { role: 'system', content: WRITER_SYSTEM_PROMPT },
       { role: 'user', content: prompt },
     ],
-    temperature: 0.7,
+    temperature: 0.85, // Higher temperature for uniqueness
     max_tokens: 400,
+    seed: uniqueSeed,
   });
 
   const content = completion.choices[0].message.content || '';
@@ -516,6 +531,7 @@ STRICT REQUIREMENTS:
 - Write in ${language}
 - Formal academic tone
 - Reflective but not personal
+- UNIQUE VARIATION: Create a unique conclusion with varied wording and reflection. (Session: ${assignmentId.slice(-8)})
 
 ${languageInstructions}
 
@@ -523,14 +539,18 @@ Write the conclusion now. Output ONLY the conclusion text, nothing else.`;
 
   console.log('[WRITER] Generating conclusion...');
 
+  // Use unique seed for variety
+  const uniqueSeed = parseInt(assignmentId.slice(-8), 16) + blockOrder;
+
   const completion = await openrouter.chat.completions.create({
     model: WRITER_MODEL,
     messages: [
       { role: 'system', content: WRITER_SYSTEM_PROMPT },
       { role: 'user', content: prompt },
     ],
-    temperature: 0.7,
+    temperature: 0.85, // Higher temperature for uniqueness
     max_tokens: 500,
+    seed: uniqueSeed,
   });
 
   const content = completion.choices[0].message.content || '';

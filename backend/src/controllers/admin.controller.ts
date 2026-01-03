@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth';
-import { UserRole } from '@prisma/client';
+import { UserRole, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import {
   getDashboardStats,
@@ -52,7 +52,8 @@ export const userDetails = async (
   try {
     const { userId } = req.params;
     const user = await getUserDetails(userId);
-    res.status(200).json(user);
+    // Wrap in { user: ... } to match frontend expectation
+    res.status(200).json({ user });
   } catch (error) {
     if (error instanceof Error && error.message === 'User not found') {
       res.status(404).json({
@@ -292,7 +293,7 @@ export const pauseAssignment = async (
     
     const assignment = await prisma.assignment.update({
       where: { id },
-      data: { status: 'paused' }
+      data: { status: 'DRAFT' } // Use valid status, no 'paused' status
     });
     
     res.status(200).json({ 
@@ -314,7 +315,7 @@ export const resumeAssignment = async (
     
     const assignment = await prisma.assignment.update({
       where: { id },
-      data: { status: 'generating' }
+      data: { status: 'GENERATING' }
     });
     
     res.status(200).json({ 
@@ -336,7 +337,7 @@ export const stopAssignment = async (
     
     const assignment = await prisma.assignment.update({
       where: { id },
-      data: { status: 'stopped' }
+      data: { status: 'FAILED' } // Use FAILED instead of 'stopped'
     });
     
     res.status(200).json({ 
@@ -356,17 +357,33 @@ export const restartAssignment = async (
   try {
     const { id } = req.params;
     
-    // Update assignment status back to pending/generating
+    // First, clear old content blocks and generation plan
+    await prisma.contentBlock.deleteMany({
+      where: { assignmentId: id }
+    });
+    
+    await prisma.generationPlan.deleteMany({
+      where: { assignmentId: id }
+    });
+    
+    // Update assignment status back to DRAFT so it can be regenerated
     const assignment = await prisma.assignment.update({
       where: { id },
       data: { 
-        status: 'GENERATING',
-        error: null
+        status: 'DRAFT',
+        error: null,
+        content: Prisma.JsonNull,
+        guidance: Prisma.JsonNull,
+        totalTokensUsed: 0,
+        totalAiCalls: 0,
+        generationDurationMs: null,
+        completedAt: null,
+        docxUrl: null,
       }
     });
     
     res.status(200).json({ 
-      message: 'Assignment restarted', 
+      message: 'Assignment reset and ready for regeneration', 
       jobId: assignment.id, 
       status: assignment.status 
     });
@@ -402,10 +419,83 @@ export const getLogs = async (
   try {
     const { type } = req.params;
     const lines = parseInt(req.query.lines as string) || 100;
+    
+    // Get AI usage logs from database
+    if (type === 'ai' || type === 'backend') {
+      const logs = await prisma.aIUsageLog.findMany({
+        take: lines,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          assignment: {
+            select: {
+              id: true,
+              snapshot: {
+                select: {
+                  unitName: true
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // Format as string for frontend display in <pre> tag
+      const logLines = logs.map(log => {
+        const timestamp = log.createdAt.toISOString();
+        const unitName = log.assignment?.snapshot?.unitName || 'Unknown';
+        return `[${timestamp}] [${log.purpose}] Model: ${log.aiModel}, Tokens: ${log.totalTokens}, Unit: ${unitName}`;
+      });
+      
+      res.status(200).json({ 
+        type, 
+        lines: logLines.length, 
+        content: logLines.join('\n'),
+        timestamp: new Date().toISOString() 
+      });
+      return;
+    }
+    
+    // Get error logs from failed assignments
+    if (type === 'error') {
+      const failedAssignments = await prisma.assignment.findMany({
+        where: { status: 'FAILED' },
+        take: lines,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          error: true,
+          createdAt: true,
+          user: {
+            select: { email: true }
+          },
+          snapshot: {
+            select: { unitName: true }
+          }
+        }
+      });
+      
+      // Format as string for frontend display
+      const errorLines = failedAssignments.map(a => {
+        const timestamp = a.createdAt.toISOString();
+        const email = a.user?.email || 'Unknown';
+        const unitName = a.snapshot?.unitName || 'Unknown';
+        return `[${timestamp}] [ERROR] User: ${email}, Unit: ${unitName}\n  Error: ${a.error || 'Unknown error'}`;
+      });
+      
+      res.status(200).json({ 
+        type, 
+        lines: errorLines.length, 
+        content: errorLines.join('\n\n'),
+        timestamp: new Date().toISOString() 
+      });
+      return;
+    }
+    
+    // Default response for other log types (placeholder - no data)
     res.status(200).json({ 
       type, 
-      lines, 
-      content: 'No logs available', 
+      lines: 0, 
+      content: `No ${type} logs available. This feature is not yet implemented.`, 
       timestamp: new Date().toISOString() 
     });
   } catch (error) {
@@ -524,11 +614,89 @@ export const getTokenAnalytics = async (
 ): Promise<void> => {
   try {
     const period = req.query.period as string || '7d';
+    
+    // Calculate date range
+    let days = 7;
+    if (period === '24h') days = 1;
+    else if (period === '30d') days = 30;
+    else if (period === '90d') days = 90;
+    else if (period === '1y') days = 365;
+    
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    
+    // Get total tokens
+    const tokenSummary = await prisma.aIUsageLog.aggregate({
+      where: { createdAt: { gte: startDate } },
+      _sum: {
+        totalTokens: true,
+        promptTokens: true,
+        completionTokens: true
+      },
+      _count: true
+    });
+    
+    // Get tokens by user
+    const tokensByUser = await prisma.aIUsageLog.groupBy({
+      by: ['userId'],
+      where: { createdAt: { gte: startDate } },
+      _sum: { totalTokens: true },
+      orderBy: { _sum: { totalTokens: 'desc' } },
+      take: 20
+    });
+    
+    // Get user details for the top users
+    const userIds = tokensByUser.map(t => t.userId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: {
+        id: true,
+        email: true,
+        studentProfile: { select: { fullName: true } }
+      }
+    });
+    
+    const userMap = new Map(users.map(u => [u.id, u]));
+    
+    const byUser = tokensByUser.map(t => ({
+      userId: t.userId,
+      email: userMap.get(t.userId)?.email || 'Unknown',
+      name: userMap.get(t.userId)?.studentProfile?.fullName || null,
+      tokens: t._sum.totalTokens || 0
+    }));
+    
+    // Get tokens by day
+    const allLogs = await prisma.aIUsageLog.findMany({
+      where: { createdAt: { gte: startDate } },
+      select: { createdAt: true, totalTokens: true }
+    });
+    
+    // Group by day
+    const byDayMap = new Map<string, { tokens: number; requests: number }>();
+    allLogs.forEach(log => {
+      const dateKey = log.createdAt.toISOString().split('T')[0];
+      const existing = byDayMap.get(dateKey) || { tokens: 0, requests: 0 };
+      byDayMap.set(dateKey, {
+        tokens: existing.tokens + log.totalTokens,
+        requests: existing.requests + 1
+      });
+    });
+    
+    const byDay = Array.from(byDayMap.entries()).map(([date, data]) => ({
+      date,
+      tokens: data.tokens,
+      requests: data.requests
+    })).sort((a, b) => a.date.localeCompare(b.date));
+    
     res.status(200).json({
       period,
-      summary: { totalTokens: 0, inputTokens: 0, outputTokens: 0, totalRequests: 0 },
-      byUser: [],
-      byDay: []
+      summary: {
+        totalTokens: tokenSummary._sum.totalTokens || 0,
+        inputTokens: tokenSummary._sum.promptTokens || 0,
+        outputTokens: tokenSummary._sum.completionTokens || 0,
+        totalRequests: tokenSummary._count || 0
+      },
+      byUser,
+      byDay
     });
   } catch (error) {
     next(error);

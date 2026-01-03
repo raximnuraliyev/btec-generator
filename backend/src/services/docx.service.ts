@@ -10,10 +10,9 @@ import {
   AlignmentType,
   WidthType,
   TableOfContents,
-  convertInchesToTwip,
   BorderStyle,
 } from 'docx';
-import { GeneratedContent, ContentSection, TableData } from '../types';
+import { GeneratedContent, TableData } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -120,60 +119,147 @@ export const generateDocx = async (
   }
 
   // LEARNING AIM SECTIONS WITH CRITERIA
+  let learningAimLetter = 'A';
   for (const section of content.sections) {
     // Skip sections without heading or content
     if (!section.heading || !section.content) continue;
 
     // Learning Aim Heading (Heading 1, Centered, Bold)
+    // Format as "AIM A: [Title]" or "AIM B: [Title]"
+    const aimHeading = section.heading.toUpperCase().startsWith('LEARNING AIM') 
+      ? `AIM ${learningAimLetter}: ${section.heading.replace(/^Learning Aim [A-Z]\s*[-–:]?\s*/i, '')}`
+      : `AIM ${learningAimLetter}: ${section.heading}`;
+    
     sections.push(
       new Paragraph({
-        text: section.heading,
+        text: aimHeading,
         heading: HeadingLevel.HEADING_1,
         alignment: AlignmentType.CENTER,
         spacing: { before: 400, after: 200 },
       })
     );
 
-    // Intro paragraph for Learning Aim (if available)
-    const contentParagraphs = section.content.split('\n\n').filter(p => p.trim());
-    
-    // First paragraph is intro to the learning aim
-    if (contentParagraphs.length > 0) {
-      sections.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: contentParagraphs[0].trim(),
-              font: FONT_NAME,
-              size: FONT_SIZE,
-            }),
-          ],
-          alignment: AlignmentType.JUSTIFIED,
-          indent: { firstLine: FIRST_LINE_INDENT },
-          spacing: { line: LINE_SPACING },
-        })
-      );
-    }
-
-    // CRITERION SECTIONS (P/M/D)
-    // Extract criterion code from heading if present (e.g., "P1 - ", "M2: ", "D1 –")
-    const criterionMatch = section.heading.match(/([PMD]\d+)/i);
-    if (criterionMatch) {
-      const criterionCode = criterionMatch[1];
+    // Check if we have structured criteria data
+    if (section.criteria && section.criteria.length > 0) {
+      console.log(`[DOCX] Section ${learningAimLetter} has ${section.criteria.length} criteria`);
       
-      // Criterion Heading (Heading 2, Left-aligned, Bold)
-      sections.push(
-        new Paragraph({
-          text: section.heading,
-          heading: HeadingLevel.HEADING_2,
-          alignment: AlignmentType.LEFT,
-          spacing: { before: 300, after: 200 },
-        })
-      );
+      // Use structured criteria - first add the intro paragraph (aim context)
+      const introText = section.content.split('\n\n')[0]?.trim();
+      if (introText) {
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: introText,
+                font: FONT_NAME,
+                size: FONT_SIZE,
+              }),
+            ],
+            alignment: AlignmentType.JUSTIFIED,
+            indent: { firstLine: FIRST_LINE_INDENT },
+            spacing: { line: LINE_SPACING },
+          })
+        );
+      }
 
-      // Criterion body content (skip first paragraph as it was used as intro)
+      // Now add each criterion with its code heading
+      for (const criterion of section.criteria) {
+        // Format criterion code with learning aim letter prefix (e.g., A.P1, A.M1, A.D1)
+        let formattedCode = criterion.code;
+        
+        // If code is just P1, M1, D1 etc., add the learning aim letter
+        if (/^[PMD]\d+$/i.test(formattedCode)) {
+          formattedCode = `${learningAimLetter}.${formattedCode.toUpperCase()}`;
+        } else if (formattedCode.includes('.')) {
+          // Already has a dot - keep as is but ensure uppercase
+          formattedCode = formattedCode.toUpperCase();
+        } else {
+          // Fallback - add learning aim letter
+          formattedCode = `${learningAimLetter}.${formattedCode.toUpperCase()}`;
+        }
+
+        console.log(`[DOCX] Adding criterion: ${formattedCode}`);
+
+        // Add criterion heading (Heading 2)
+        sections.push(
+          new Paragraph({
+            text: formattedCode,
+            heading: HeadingLevel.HEADING_2,
+            alignment: AlignmentType.LEFT,
+            spacing: { before: 300, after: 200 },
+          })
+        );
+
+        // Add criterion content paragraphs
+        const criterionParagraphs = criterion.content.split('\n\n').filter(p => p.trim());
+        for (const paragraph of criterionParagraphs) {
+          sections.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: paragraph.trim(),
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: { firstLine: FIRST_LINE_INDENT },
+              spacing: { line: LINE_SPACING },
+            })
+          );
+        }
+      }
+    } else {
+      console.log(`[DOCX] Section ${learningAimLetter} has NO structured criteria - using fallback`);
+      
+      // Fallback: parse content and try to identify criteria by paragraph structure
+      const contentParagraphs = section.content.split('\n\n').filter(p => p.trim());
+      
+      // Track criterion index for this learning aim
+      let criterionIndex = 0;
+      
+      // First paragraph is intro to the learning aim (aim context)
+      if (contentParagraphs.length > 0) {
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: contentParagraphs[0].trim(),
+                font: FONT_NAME,
+                size: FONT_SIZE,
+              }),
+            ],
+            alignment: AlignmentType.JUSTIFIED,
+            indent: { firstLine: FIRST_LINE_INDENT },
+            spacing: { line: LINE_SPACING },
+          })
+        );
+      }
+
+      // Process remaining paragraphs as criterion content
       for (let i = 1; i < contentParagraphs.length; i++) {
         const paragraph = contentParagraphs[i].trim();
+        
+        // Add criterion heading if it's a substantial block (more than 150 chars indicates new criterion)
+        if (paragraph.length > 150) {
+          criterionIndex++;
+          // Determine criterion type based on position
+          let criterionType = 'P'; // Default to Pass
+          if (criterionIndex > 3) criterionType = 'M';
+          if (criterionIndex > 5) criterionType = 'D';
+          
+          const criterionCode = `${learningAimLetter}.${criterionType}${criterionIndex <= 3 ? criterionIndex : (criterionIndex <= 5 ? criterionIndex - 3 : criterionIndex - 5)}`;
+          
+          // Add criterion heading
+          sections.push(
+            new Paragraph({
+              text: criterionCode,
+              heading: HeadingLevel.HEADING_2,
+              alignment: AlignmentType.LEFT,
+              spacing: { before: 300, after: 200 },
+            })
+          );
+        }
         
         sections.push(
           new Paragraph({
@@ -190,25 +276,10 @@ export const generateDocx = async (
           })
         );
       }
-    } else {
-      // Regular content paragraphs (not a criterion)
-      for (let i = 1; i < contentParagraphs.length; i++) {
-        sections.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: contentParagraphs[i].trim(),
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: { firstLine: FIRST_LINE_INDENT },
-            spacing: { line: LINE_SPACING },
-          })
-        );
-      }
     }
+    
+    // Increment learning aim letter for next section
+    learningAimLetter = String.fromCharCode(learningAimLetter.charCodeAt(0) + 1);
 
     // Add tables if present (after explanatory paragraphs)
     if (section.tables && section.tables.length > 0) {
@@ -238,6 +309,29 @@ export const generateDocx = async (
     // Add image placeholders if present
     if (section.images && section.images.length > 0) {
       for (const image of section.images) {
+        // Add a placeholder box for the image
+        sections.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `[IMAGE PLACEHOLDER]`,
+                font: FONT_NAME,
+                size: FONT_SIZE,
+                bold: true,
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 200, after: 100 },
+            border: {
+              top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+            },
+          })
+        );
+        
+        // Figure caption below placeholder
         sections.push(
           new Paragraph({
             children: [
@@ -250,7 +344,7 @@ export const generateDocx = async (
               }),
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { before: 200, after: 200 },
+            spacing: { after: 200 },
           })
         );
         figureCounter++;
@@ -299,29 +393,31 @@ export const generateDocx = async (
       })
     );
 
-    // Sort references alphabetically
+    // Sort references by order number, then alphabetically
     const sortedReferences = [...content.references].sort((a, b) => {
+      if (a.order !== b.order) return (a.order || 0) - (b.order || 0);
       const textA = a.text || '';
       const textB = b.text || '';
       return textA.localeCompare(textB);
     });
 
-    for (const reference of sortedReferences) {
+    // Add numbered references (simple format: 1. Reference text)
+    sortedReferences.forEach((reference, index) => {
       sections.push(
         new Paragraph({
           children: [
             new TextRun({
-              text: reference.text,
+              text: `${index + 1}. ${reference.text}`,
               font: FONT_NAME,
               size: FONT_SIZE,
             }),
           ],
           alignment: AlignmentType.LEFT,
-          indent: { hanging: 360 }, // Hanging indent for references
-          spacing: { line: LINE_SPACING, after: 100 },
+          indent: { left: 360, hanging: 360 }, // Hanging indent for references
+          spacing: { line: LINE_SPACING, after: 120 },
         })
       );
-    }
+    });
   }
 
   const doc = new Document({

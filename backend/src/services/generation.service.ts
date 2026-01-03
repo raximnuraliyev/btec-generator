@@ -4,7 +4,7 @@ import { generateContentBlock, generateIntroduction, generateLearningAimContent,
 import { deductTokens } from './token.service';
 import { generateDocx } from './docx.service';
 import { generateWritingGuidance } from './guidance.service';
-import { GeneratedContent, ContentSection, Reference } from '../types';
+import { GeneratedContent, ContentSection, CriterionBlock } from '../types';
 
 /**
  * CANONICAL ASSIGNMENT GENERATION FLOW
@@ -318,6 +318,7 @@ async function generatePhasedContent(
     let sectionContent = aimContextContent;
     const sectionTables: any[] = [];
     const sectionImages: any[] = [];
+    const sectionCriteria: CriterionBlock[] = [];
 
     // Generate each criterion ONE BY ONE
     for (const criterionCode of (section.coversCriteria || [])) {
@@ -327,14 +328,19 @@ async function generatePhasedContent(
         continue;
       }
 
-      console.log(`[GENERATION] Generating criterion: ${criterionCode}`);
+      // Get learning aim letter from section (e.g., "A", "B", "C")
+      const aimLetter = section.learningAim || section.id || 'A';
+      // Create full criterion code with aim letter prefix (e.g., "A.P1", "B.M2")
+      const fullCriterionCode = `${aimLetter}.${criterion.code}`;
+
+      console.log(`[GENERATION] Generating criterion: ${fullCriterionCode}`);
       
       const criterionContent = await generateContentBlock(
         briefSnapshot,
         generationPlan,
         {
           sectionId: section.id,
-          criterionCode: criterion.code,
+          criterionCode: fullCriterionCode,
           criterionDescription: criterion.description,
           previousContentSummary: previousSummary,
         },
@@ -343,44 +349,77 @@ async function generatePhasedContent(
         blockOrder++
       );
       
+      // Add to criteria array for structured output
+      sectionCriteria.push({
+        code: fullCriterionCode,
+        content: criterionContent
+      });
+      
       sectionContent += `\n\n${criterionContent}`;
       previousSummary = criterionContent.substring(0, 200);
     }
 
     // Add tables if required (CONDITIONAL)
-    if (briefSnapshot.options.includeTables && generationPlan.tables) {
-      const sectionTableDefs = generationPlan.tables.filter(
+    // Generate tables based on the criteria covered in this section
+    if (briefSnapshot.options.includeTables) {
+      // First check if planner defined tables for this section
+      const sectionTableDefs = (generationPlan.tables || []).filter(
         (t: any) => t.placementAfterSectionId === section.id
       );
       
-      for (const tableDef of sectionTableDefs) {
+      if (sectionTableDefs.length > 0) {
+        for (const tableDef of sectionTableDefs) {
+          sectionTables.push({
+            caption: tableDef.title || `Comparison Table for ${section.title}`,
+            headers: ['Aspect', 'Description', 'Application to Scenario'],
+            rows: [
+              ['Key Feature 1', 'Description of this feature', 'How it applies in the vocational context'],
+              ['Key Feature 2', 'Description of this feature', 'How it applies in the vocational context'],
+              ['Key Feature 3', 'Description of this feature', 'How it applies in the vocational context'],
+            ]
+          });
+        }
+      } else {
+        // Auto-generate a table for each learning aim section
         sectionTables.push({
-          caption: tableDef.title,
-          headers: ['Feature', 'Description', 'Application'],
+          caption: `Key Concepts for ${section.title}`,
+          headers: ['Concept', 'Definition', 'Application'],
           rows: [
-            ['Example 1', 'Description of feature', 'How it applies to scenario'],
-            ['Example 2', 'Description of feature', 'How it applies to scenario'],
+            ['Concept 1', 'Definition of this concept', 'How it applies to the scenario'],
+            ['Concept 2', 'Definition of this concept', 'How it applies to the scenario'],
+            ['Concept 3', 'Definition of this concept', 'How it applies to the scenario'],
           ]
         });
       }
     }
 
     // Add image placeholders if enabled (CONDITIONAL)
-    if (briefSnapshot.options.includeImages && generationPlan.images) {
-      const sectionImageDefs = generationPlan.images.filter(
+    if (briefSnapshot.options.includeImages) {
+      // First check if planner defined images for this section
+      const sectionImageDefs = (generationPlan.images || []).filter(
         (i: any) => i.placementAfterSectionId === section.id
       );
       
-      for (const imageDef of sectionImageDefs) {
+      if (sectionImageDefs.length > 0) {
+        for (const imageDef of sectionImageDefs) {
+          sectionImages.push({
+            description: imageDef.caption
+          });
+        }
+      } else {
+        // Auto-generate an image placeholder for each learning aim section
         sectionImages.push({
-          description: imageDef.caption
+          description: `Diagram illustrating key concepts from ${section.title}`
         });
       }
     }
 
+    console.log(`[GENERATION] Section ${section.title}: ${sectionCriteria.length} criteria, ${sectionTables.length} tables, ${sectionImages.length} images`);
+
     sections.push({
       heading: section.title,
       content: sectionContent,
+      criteria: sectionCriteria.length > 0 ? sectionCriteria : undefined,
       tables: sectionTables.length > 0 ? sectionTables : undefined,
       images: sectionImages.length > 0 ? sectionImages : undefined,
     });
