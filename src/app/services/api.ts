@@ -225,13 +225,13 @@ export interface DiscordStatus {
 
 export const discordApi = {
   generateCode: () =>
-    api.post<DiscordLinkCode>('/auth/discord/generate-code'),
+    api.post<DiscordLinkCode>('/discord/generate-code'),
 
   getStatus: () =>
-    api.get<DiscordStatus>('/auth/discord/status'),
+    api.get<DiscordStatus>('/discord/status'),
 
   unlink: () =>
-    api.delete<{ unlinked: boolean }>('/auth/discord/unlink'),
+    api.delete<{ unlinked: boolean }>('/discord/unlink'),
 };
 
 // =============================================================================
@@ -855,6 +855,13 @@ export const adminApi = {
   cancelAssignment: (id: string) =>
     api.post<{ success: boolean }>(`/admin/assignments/${id}/cancel`),
 
+  // Bulk actions
+  deleteAssignments: (ids: string[]) =>
+    api.post<{ success: boolean; deleted: number }>('/admin/assignments/bulk-delete', { ids }),
+
+  regenerateAssignments: (ids: string[]) =>
+    api.post<{ success: boolean; regenerated: number }>('/admin/assignments/bulk-regenerate', { ids }),
+
   // Export
   exportAssignments: async (filters?: any): Promise<Blob> => {
     const token = localStorage.getItem('btec_token');
@@ -980,4 +987,134 @@ export const generationApi = {
   
   getContent: (assignmentId: string) => 
     api.get<GenerationContent>(`/generation/content/${assignmentId}`),
+};
+
+// =============================================================================
+// PAYMENT API
+// =============================================================================
+
+export type PaymentPlanType = 'P' | 'PM' | 'PMD' | 'CUSTOM';
+export type PaymentMethod = 'HUMO' | 'UZCARD' | 'PAYME';
+export type PaymentStatus = 'WAITING_PAYMENT' | 'PAID' | 'REJECTED' | 'EXPIRED';
+export type GradeType = 'PASS' | 'MERIT' | 'DISTINCTION';
+
+export interface PaymentPlan {
+  type: PaymentPlanType;
+  name: string;
+  price: number;
+  priceFormatted: string;
+  tokensPerMonth: number;
+  assignments: number;
+  grades: GradeType[];
+  durationDays: number;
+  isCustom: boolean;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  userId: string;
+  planType: PaymentPlanType;
+  customTokens?: number;
+  customGrade?: GradeType;
+  baseAmount: number;
+  uniqueSuffix: number;
+  finalAmount: number;
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
+  createdAt: string;
+  expiresAt: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  approvedByAdminId?: string;
+  rejectionReason?: string;
+  assignmentsGranted?: number;
+  tokensGranted?: number;
+  gradesGranted?: string[];
+  planExpiresAt?: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+}
+
+export interface PaymentInstructions {
+  cardNumber: string;
+  exactAmount: number;
+  expiresAt: string;
+  warnings: string[];
+}
+
+export interface CreatePaymentResponse {
+  payment: PaymentTransaction;
+  cardNumber: string;
+  instructions: PaymentInstructions;
+}
+
+export interface PaymentStats {
+  totalPayments: number;
+  pendingPayments: number;
+  approvedPayments: number;
+  rejectedPayments: number;
+  expiredPayments: number;
+  totalRevenue: number;
+}
+
+export const paymentApi = {
+  // User endpoints
+  getPlans: () => 
+    api.get<{ plans: PaymentPlan[]; cardNumber: string }>('/payments/plans'),
+  
+  createPayment: (data: {
+    planType: PaymentPlanType;
+    paymentMethod?: PaymentMethod;
+    customTokens?: number;
+    customGrade?: GradeType;
+  }) => 
+    api.post<CreatePaymentResponse>('/payments/create', data),
+  
+  getActivePayment: () => 
+    api.get<{ payment: PaymentTransaction | null; cardNumber: string }>('/payments/active'),
+  
+  getPaymentHistory: () => 
+    api.get<{ payments: PaymentTransaction[] }>('/payments/history'),
+  
+  cancelPayment: (paymentId: string) => 
+    api.post<{ payment: PaymentTransaction; message: string }>(`/payments/${paymentId}/cancel`),
+  
+  calculateCustomPrice: (tokens: number) => 
+    api.post<{ tokens: number; price: number; priceFormatted: string }>('/payments/calculate-custom', { tokens }),
+  
+  // Admin endpoints
+  getAllPayments: (page = 1, limit = 50, status?: PaymentStatus, userId?: string) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (status) params.append('status', status);
+    if (userId) params.append('userId', userId);
+    return api.get<{ payments: PaymentTransaction[]; total: number; page: number; totalPages: number }>(
+      `/payments/admin/all?${params}`
+    );
+  },
+  
+  getPendingPayments: (page = 1, limit = 50) => 
+    api.get<{ payments: PaymentTransaction[]; total: number; page: number; totalPages: number }>(
+      `/payments/admin/pending?page=${page}&limit=${limit}`
+    ),
+  
+  getPaymentStats: () => 
+    api.get<PaymentStats>('/payments/admin/stats'),
+  
+  getPaymentDetails: (paymentId: string) => 
+    api.get<{ payment: PaymentTransaction }>(`/payments/admin/${paymentId}`),
+  
+  findPaymentByAmount: (amount: number) => 
+    api.get<{ payment: PaymentTransaction }>(`/payments/admin/find-by-amount?amount=${amount}`),
+  
+  approvePayment: (paymentId: string) => 
+    api.post<{ payment: PaymentTransaction; message: string }>(`/payments/admin/${paymentId}/approve`),
+  
+  rejectPayment: (paymentId: string, reason: string) => 
+    api.post<{ payment: PaymentTransaction; message: string }>(`/payments/admin/${paymentId}/reject`, { reason }),
+  
+  expireOldPayments: () => 
+    api.post<{ message: string; expiredCount: number }>('/payments/admin/expire-old'),
 };

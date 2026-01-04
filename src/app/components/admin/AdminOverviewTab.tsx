@@ -111,21 +111,21 @@ export function AdminOverviewTab() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       {/* Controls Bar */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">System Overview</h2>
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h2 className="text-lg md:text-xl font-bold">System Overview</h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="w-4 h-4"
+              className="w-5 h-5 min-h-[44px]"
             />
             Auto-refresh (30s)
           </label>
-          <Button onClick={loadData} variant="outline" className="border-2 border-black">
+          <Button onClick={loadData} variant="outline" className="border-2 border-black min-h-[44px] w-full sm:w-auto">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
@@ -135,14 +135,16 @@ export function AdminOverviewTab() {
       {/* System Status Alert */}
       {systemStatus?.generationPaused && (
         <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-red-700">
-            <AlertTriangle className="w-5 h-5" />
-            <span className="font-bold">GENERATION PAUSED</span>
-            <span className="text-sm">- All generation is currently stopped</span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 text-red-700">
+            <div className="flex items-center gap-2 flex-wrap">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <span className="font-bold">GENERATION PAUSED</span>
+              <span className="text-sm">- All generation is currently stopped</span>
+            </div>
             <Button 
               onClick={handleResumeGeneration} 
               disabled={actionLoading}
-              className="ml-auto bg-red-600 hover:bg-red-700 text-white"
+              className="sm:ml-auto bg-red-600 hover:bg-red-700 text-white min-h-[44px] w-full sm:w-auto"
             >
               <Play className="w-4 h-4 mr-1" /> Resume Generation
             </Button>
@@ -161,18 +163,18 @@ export function AdminOverviewTab() {
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {pendingApprovals.slice(0, 5).map((assignment) => (
-              <div key={assignment.id} className="bg-white p-3 rounded border border-orange-200 flex items-center justify-between">
+              <div key={assignment.id} className="bg-white p-3 rounded border border-orange-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{assignment.snapshot?.unitName || 'Untitled'}</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-xs sm:text-sm text-gray-500">
                     {assignment.user?.email} • Level {assignment.snapshot?.level} • {assignment.grade}
                   </p>
                 </div>
-                <div className="flex gap-2 ml-4">
+                <div className="flex gap-2">
                   <button
                     onClick={() => handleApprove(assignment.id)}
                     disabled={approvingId === assignment.id}
-                    className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
+                    className="px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50 min-h-[44px]"
                   >
                     {approvingId === assignment.id ? '...' : '✓ Approve'}
                   </button>
@@ -184,7 +186,7 @@ export function AdminOverviewTab() {
       )}
 
       {/* Main Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
           label="Total Users" 
           value={stats?.totals?.users || 0} 
@@ -211,28 +213,28 @@ export function AdminOverviewTab() {
       </div>
 
       {/* Queue & AI Health */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {/* Queue Status */}
-        <div className="bg-white border-2 border-black p-6">
+        <div className="bg-white border-2 border-black p-4 md:p-6">
           <h3 className="font-bold mb-4 flex items-center gap-2">
             <Server className="w-5 h-5" />
             Queue Status
           </h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span>Active Jobs</span>
+              <span className="text-sm md:text-base">Active Jobs</span>
               <span className="font-mono font-bold text-green-600">{systemStatus?.activeJobs || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span>Waiting Jobs</span>
+              <span className="text-sm md:text-base">Waiting Jobs</span>
               <span className="font-mono font-bold text-yellow-600">{systemStatus?.queuedJobs || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span>Failed (24h)</span>
+              <span className="text-sm md:text-base">Failed (24h)</span>
               <span className="font-mono font-bold text-red-600">{systemStatus?.failedJobsLast24h || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span>Avg Generation Time</span>
+              <span className="text-sm md:text-base">Avg Generation Time</span>
               <span className="font-mono">{systemStatus?.averageGenerationTime ? `${Math.round(systemStatus.averageGenerationTime / 1000)}s` : 'N/A'}</span>
             </div>
           </div>
@@ -241,7 +243,7 @@ export function AdminOverviewTab() {
               <Button 
                 onClick={handleResumeGeneration} 
                 disabled={actionLoading}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                className="w-full bg-green-600 hover:bg-green-700 text-white min-h-[44px]"
               >
                 <Play className="w-4 h-4 mr-2" />
                 Resume All Generation
@@ -251,7 +253,7 @@ export function AdminOverviewTab() {
                 onClick={handlePauseGeneration} 
                 disabled={actionLoading}
                 variant="outline"
-                className="w-full border-red-500 text-red-600 hover:bg-red-50"
+                className="w-full border-red-500 text-red-600 hover:bg-red-50 min-h-[44px]"
               >
                 <Pause className="w-4 h-4 mr-2" />
                 Emergency: Pause All
@@ -261,7 +263,7 @@ export function AdminOverviewTab() {
         </div>
 
         {/* AI Health */}
-        <div className="bg-white border-2 border-black p-6">
+        <div className="bg-white border-2 border-black p-4 md:p-6">
           <h3 className="font-bold mb-4 flex items-center gap-2">
             <Activity className="w-5 h-5" />
             AI Models Health
@@ -269,20 +271,20 @@ export function AdminOverviewTab() {
           {systemStatus?.aiModelsHealth && systemStatus.aiModelsHealth.length > 0 ? (
             <div className="space-y-3">
               {systemStatus.aiModelsHealth.map((model, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <div className="flex items-center gap-2">
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     {model.status === 'healthy' ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                     ) : model.status === 'degraded' ? (
-                      <AlertCircle className="w-4 h-4 text-yellow-500" />
+                      <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                     ) : (
-                      <XCircle className="w-4 h-4 text-red-500" />
+                      <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                     )}
-                    <span className="font-mono text-sm">{model.model}</span>
+                    <span className="font-mono text-xs md:text-sm truncate">{model.model}</span>
                   </div>
-                  <div className="text-sm">
+                  <div className="text-xs md:text-sm flex-shrink-0">
                     <span className={model.failRate > 10 ? 'text-red-600' : 'text-gray-500'}>
-                      {model.failRate.toFixed(1)}% fail rate
+                      {model.failRate.toFixed(1)}% fail
                     </span>
                   </div>
                 </div>
@@ -291,23 +293,23 @@ export function AdminOverviewTab() {
           ) : (
             <div className="text-center py-8 text-gray-500">
               <Activity className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-              <p>No AI health data available</p>
+              <p className="text-sm">No AI health data available</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white border-2 border-black p-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        <div className="bg-white border-2 border-black p-4 md:p-6">
           <h3 className="font-bold mb-4">Recent Users</h3>
           <div className="space-y-3">
             {stats?.recentUsers && stats.recentUsers.length > 0 ? (
               stats.recentUsers.slice(0, 5).map(user => (
-                <div key={user.id} className="flex justify-between items-center text-sm">
-                  <div>
-                    <p className="font-medium">{user.name || 'No name'}</p>
-                    <p className="text-gray-500">{user.email}</p>
+                <div key={user.id} className="flex justify-between items-center gap-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{user.name || 'No name'}</p>
+                    <p className="text-gray-500 truncate text-xs md:text-sm">{user.email}</p>
                   </div>
                   <RoleBadge role={user.role} />
                 </div>
@@ -318,17 +320,17 @@ export function AdminOverviewTab() {
           </div>
         </div>
 
-        <div className="bg-white border-2 border-black p-6">
+        <div className="bg-white border-2 border-black p-4 md:p-6">
           <h3 className="font-bold mb-4">Recent Assignments</h3>
           <div className="space-y-3">
             {stats?.recentAssignments && stats.recentAssignments.length > 0 ? (
               stats.recentAssignments.slice(0, 5).map(assignment => (
-                <div key={assignment.id} className="flex justify-between items-center text-sm">
-                  <div className="overflow-hidden">
+                <div key={assignment.id} className="flex justify-between items-center gap-2 text-sm">
+                  <div className="overflow-hidden min-w-0">
                     <p className="font-medium truncate">
                       {assignment.snapshot?.unitName || 'Untitled Assignment'}
                     </p>
-                    <p className="text-gray-500">{assignment.user?.email || 'Unknown user'}</p>
+                    <p className="text-gray-500 truncate text-xs md:text-sm">{assignment.user?.email || 'Unknown user'}</p>
                   </div>
                   <StatusBadge status={assignment.status} />
                 </div>
@@ -361,22 +363,22 @@ function StatCard({
 
   return (
     <div 
-      className={`border-2 p-6 ${highlight ? 'border-yellow-500 bg-yellow-50' : 'border-black bg-white'} cursor-pointer transition-all hover:shadow-lg`}
+      className={`border-2 p-4 md:p-6 ${highlight ? 'border-yellow-500 bg-yellow-50' : 'border-black bg-white'} cursor-pointer transition-all hover:shadow-lg min-h-[44px]`}
       onClick={() => breakdown && setShowBreakdown(!showBreakdown)}
     >
       <div className="flex items-center justify-between mb-2">
-        <Icon className={`w-6 h-6 ${highlight ? 'text-yellow-600' : 'text-gray-400'}`} />
+        <Icon className={`w-5 h-5 md:w-6 md:h-6 ${highlight ? 'text-yellow-600' : 'text-gray-400'}`} />
         {breakdown && (
           <span className="text-xs text-gray-400">{showBreakdown ? '▲' : '▼'}</span>
         )}
       </div>
-      <p className="text-3xl font-bold">{value.toLocaleString()}</p>
-      <p className="text-sm text-gray-600">{label}</p>
+      <p className="text-2xl md:text-3xl font-bold">{value.toLocaleString()}</p>
+      <p className="text-xs md:text-sm text-gray-600">{label}</p>
       
       {showBreakdown && breakdown && (
         <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
           {Object.entries(breakdown).map(([key, count]) => (
-            <div key={key} className="flex justify-between text-sm">
+            <div key={key} className="flex justify-between text-xs md:text-sm">
               <span className="text-gray-600">{key}</span>
               <span className="font-mono">{count}</span>
             </div>

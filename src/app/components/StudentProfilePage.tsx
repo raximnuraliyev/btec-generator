@@ -82,7 +82,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Loading profile...</p>
@@ -96,26 +96,26 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
       {/* Header */}
       <header className="bg-white border-b-2 border-black">
         <div className="max-w-3xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <Button 
               variant="ghost" 
               onClick={() => onNavigate('dashboard')}
-              className="hover:bg-gray-100"
+              className="hover:bg-gray-100 min-h-[44px]"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
               Back
             </Button>
-            <h1 className="text-xl font-bold">
+            <h1 className="text-lg md:text-xl font-bold">
               {hasExisting ? 'Update Academic Profile' : 'Complete Your Academic Profile'}
             </h1>
           </div>
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-6 md:py-8">
         {/* Info Banner */}
         <div className="bg-white border-2 border-black p-4 mb-6">
-          <p className="text-gray-600">
+          <p className="text-sm md:text-base text-gray-600">
             <strong>Why we need this:</strong> Your academic information is used to personalize your assignments. 
             This includes adding your name, university, and department to generated documents.
           </p>
@@ -124,16 +124,16 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
         {/* Success Message */}
         {success && (
           <div className="bg-green-50 border-2 border-green-500 p-4 mb-6 flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-green-500" />
-            <p className="text-green-700 font-medium">Profile saved successfully!</p>
+            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+            <p className="text-green-700 font-medium text-sm md:text-base">Profile saved successfully!</p>
           </div>
         )}
 
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border-2 border-red-500 p-4 mb-6 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500" />
-            <p className="text-red-700 font-medium">{error}</p>
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <p className="text-red-700 font-medium text-sm md:text-base">{error}</p>
           </div>
         )}
 
@@ -145,7 +145,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
               <User className="w-5 h-5" />
               <h2 className="font-bold">Personal Information</h2>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4">
               <div>
                 <Label htmlFor="fullName" className="text-sm font-bold mb-2 block">
                   Full Name <span className="text-red-500">*</span>
@@ -155,7 +155,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
                   value={profile.fullName}
                   onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
                   placeholder="Enter your full legal name"
-                  className="border-2 border-black focus:ring-2 focus:ring-black"
+                  className="border-2 border-black focus:ring-2 focus:ring-black min-h-[44px]"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">This will appear on your assignments</p>
@@ -169,7 +169,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
               <School className="w-5 h-5" />
               <h2 className="font-bold">Academic Information</h2>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4">
               <div>
                 <Label htmlFor="universityName" className="text-sm font-bold mb-2 block">
                   University/College Name <span className="text-red-500">*</span>
@@ -179,7 +179,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
                   value={profile.universityName}
                   onChange={(e) => setProfile({ ...profile, universityName: e.target.value })}
                   placeholder="e.g., Westminster International University"
-                  className="border-2 border-black focus:ring-2 focus:ring-black"
+                  className="border-2 border-black focus:ring-2 focus:ring-black min-h-[44px]"
                   required
                 />
               </div>
@@ -193,7 +193,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
                   value={profile.faculty}
                   onChange={(e) => setProfile({ ...profile, faculty: e.target.value })}
                   placeholder="e.g., Faculty of Computing, Business School"
-                  className="border-2 border-black focus:ring-2 focus:ring-black"
+                  className="border-2 border-black focus:ring-2 focus:ring-black min-h-[44px]"
                   required
                 />
               </div>
@@ -207,7 +207,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
                   value={profile.groupName}
                   onChange={(e) => setProfile({ ...profile, groupName: e.target.value })}
                   placeholder="e.g., Group A, CS-2024"
-                  className="border-2 border-black focus:ring-2 focus:ring-black"
+                  className="border-2 border-black focus:ring-2 focus:ring-black min-h-[44px]"
                   required
                 />
               </div>
@@ -220,7 +220,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
               <MapPin className="w-5 h-5" />
               <h2 className="font-bold">Location</h2>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4">
               <div>
                 <Label htmlFor="city" className="text-sm font-bold mb-2 block">
                   City <span className="text-red-500">*</span>
@@ -230,7 +230,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
                   value={profile.city}
                   onChange={(e) => setProfile({ ...profile, city: e.target.value })}
                   placeholder="e.g., Tashkent"
-                  className="border-2 border-black focus:ring-2 focus:ring-black"
+                  className="border-2 border-black focus:ring-2 focus:ring-black min-h-[44px]"
                   required
                 />
               </div>
@@ -244,7 +244,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
                   value={profile.academicYear || ''}
                   onChange={(e) => setProfile({ ...profile, academicYear: e.target.value })}
                   placeholder="e.g., 2024/2025"
-                  className="border-2 border-black focus:ring-2 focus:ring-black"
+                  className="border-2 border-black focus:ring-2 focus:ring-black min-h-[44px]"
                 />
               </div>
             </div>
@@ -252,27 +252,27 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
 
           {/* Privacy Notice */}
           <div className="bg-gray-100 border-2 border-gray-300 p-4 mb-6">
-            <p className="text-sm text-gray-600">
+            <p className="text-xs md:text-sm text-gray-600">
               <strong>🔒 Privacy Notice:</strong> Your profile information is encrypted and stored securely. 
               It is used only for personalizing your assignments and is never shared with third parties.
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => onNavigate('dashboard')}
               disabled={saving}
-              className="border-2 border-black hover:bg-gray-100"
+              className="border-2 border-black hover:bg-gray-100 min-h-[44px] w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={saving}
-              className="bg-black text-white hover:bg-gray-800 px-8"
+              className="bg-black text-white hover:bg-gray-800 px-8 min-h-[44px] w-full sm:w-auto"
             >
               {saving ? (
                 <>

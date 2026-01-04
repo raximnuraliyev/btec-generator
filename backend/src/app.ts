@@ -9,6 +9,8 @@ import adminRoutes from './routes/admin.routes';
 import tokenRoutes from './routes/token.routes';
 import generationRoutes from './routes/generation.routes';
 import issueRoutes from './routes/issue.routes';
+import paymentRoutes from './routes/payment.routes';
+import discordRoutes from './routes/discord.routes';
 import { errorHandler } from './middlewares/error';
 import path from 'path';
 
@@ -41,6 +43,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/generation', generationRoutes);
 app.use('/api/issues', issueRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/discord', discordRoutes);
 
 // 404 Handler
 app.use((req, res) => {

@@ -178,52 +178,94 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
 
   const selectedBriefData = briefs.find((b) => b.id === selectedBrief);
 
+  // Calculate total steps for progress
+  const totalSteps = 6;
+
   return (
-    <div className="container max-w-4xl mx-auto py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Generate Assignment Guide</CardTitle>
-          <CardDescription>
-            Follow the steps to create your personalized teaching guide
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          {/* Step 1: Select Level */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              {step > 1 && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-              <Label className="text-lg font-semibold">Step 1: Select Level</Label>
-            </div>
-            {step >= 1 && (
-              <RadioGroup
-                value={selectedLevel?.toString() || ''}
-                onValueChange={(value) => {
-                  setSelectedLevel(parseInt(value));
-                  setSelectedBrief('');
-                  if (step === 1) setStep(2);
-                }}
-              >
-                <div className="grid grid-cols-4 gap-4">
-                  {[3, 4, 5, 6].map((level) => (
-                    <div key={level} className="flex items-center space-x-2">
-                      <RadioGroupItem value={level.toString()} id={`level-${level}`} />
-                      <Label htmlFor={`level-${level}`}>Level {level}</Label>
-                    </div>
-                  ))}
-                </div>
-              </RadioGroup>
-            )}
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Progress Bar - Fixed at top */}
+      <div className="sticky top-0 z-50 bg-white border-b shadow-sm sm:hidden">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Step {step} of {totalSteps}</span>
+            <button 
+              onClick={() => onNavigate('dashboard')} 
+              className="text-sm text-gray-600 hover:text-black min-h-[44px] px-2"
+            >
+              Cancel
+            </button>
           </div>
+          <div className="w-full bg-gray-200 h-2 rounded-full">
+            <div 
+              className="bg-black h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(step / totalSteps) * 100}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="container max-w-4xl mx-auto px-4 py-4 sm:py-8">
+        <Card>
+          <CardHeader className="pb-4 sm:pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl sm:text-2xl">Generate Assignment Guide</CardTitle>
+                <CardDescription className="text-sm sm:text-base mt-1">
+                  Follow the steps to create your personalized teaching guide
+                </CardDescription>
+              </div>
+              {/* Desktop progress indicator */}
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-sm text-gray-600">Step {step} of {totalSteps}</span>
+                <div className="w-24 bg-gray-200 h-2 rounded-full">
+                  <div 
+                    className="bg-black h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(step / totalSteps) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6 sm:space-y-8 pb-6 sm:pb-8">
+            {/* Step 1: Select Level */}
+            <div>
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                {step > 1 && <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />}
+                <Label className="text-base sm:text-lg font-semibold">Step 1: Select Level</Label>
+              </div>
+              {step >= 1 && (
+                <RadioGroup
+                  value={selectedLevel?.toString() || ''}
+                  onValueChange={(value) => {
+                    setSelectedLevel(parseInt(value));
+                    setSelectedBrief('');
+                    if (step === 1) setStep(2);
+                  }}
+                >
+                  {/* Mobile: 2 columns, Desktop: 4 columns */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    {[3, 4, 5, 6].map((level) => (
+                      <div key={level} className="flex items-center space-x-2 border rounded p-3 min-h-[44px]">
+                        <RadioGroupItem value={level.toString()} id={`level-${level}`} />
+                        <Label htmlFor={`level-${level}`} className="cursor-pointer flex-1">Level {level}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </RadioGroup>
+              )}
+            </div>
 
           {/* Step 2: Select Brief */}
           {step >= 2 && selectedLevel && (
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                {step > 2 && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                <Label className="text-lg font-semibold">Step 2: Select Brief</Label>
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                {step > 2 && <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />}
+                <Label className="text-base sm:text-lg font-semibold">Step 2: Select Brief</Label>
               </div>
               {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin" />
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
               ) : briefs.length === 0 ? (
                 <Alert>
                   <AlertDescription>No briefs available for Level {selectedLevel}</AlertDescription>
@@ -238,12 +280,12 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
                 >
                   <div className="space-y-3">
                     {briefs.map((brief) => (
-                      <div key={brief.id} className="flex items-start space-x-2 border rounded p-3">
+                      <div key={brief.id} className="flex items-start space-x-3 border rounded p-3 sm:p-4 min-h-[44px]">
                         <RadioGroupItem value={brief.id} id={`brief-${brief.id}`} className="mt-1" />
                         <Label htmlFor={`brief-${brief.id}`} className="flex-1 cursor-pointer">
-                          <div className="font-semibold">{brief.unitName}</div>
-                          <div className="text-sm text-muted-foreground">{brief.unitCode}</div>
-                          <div className="text-sm mt-2">{brief.vocationalScenario?.substring(0, 150) || 'No scenario available'}...</div>
+                          <div className="font-semibold text-sm sm:text-base">{brief.unitName}</div>
+                          <div className="text-xs sm:text-sm text-muted-foreground">{brief.unitCode}</div>
+                          <div className="text-xs sm:text-sm mt-2 line-clamp-3">{brief.vocationalScenario?.substring(0, 150) || 'No scenario available'}...</div>
                         </Label>
                       </div>
                     ))}
@@ -256,9 +298,9 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
           {/* Step 3: Select Grade */}
           {step >= 3 && selectedBrief && (
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                {step > 3 && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                <Label className="text-lg font-semibold">Step 3: Select Grade Target</Label>
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                {step > 3 && <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />}
+                <Label className="text-base sm:text-lg font-semibold">Step 3: Select Grade Target</Label>
               </div>
               <RadioGroup
                 value={selectedGrade}
@@ -267,11 +309,12 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
                   if (step === 3) setStep(4);
                 }}
               >
-                <div className="grid grid-cols-3 gap-4">
+                {/* Mobile: stacked, Desktop: 3 columns */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   {GRADES.map((grade) => (
-                    <div key={grade} className="flex items-center space-x-2 border rounded p-3">
+                    <div key={grade} className="flex items-center space-x-2 border rounded p-3 min-h-[44px]">
                       <RadioGroupItem value={grade} id={`grade-${grade}`} />
-                      <Label htmlFor={`grade-${grade}`}>{grade}</Label>
+                      <Label htmlFor={`grade-${grade}`} className="cursor-pointer flex-1">{grade}</Label>
                     </div>
                   ))}
                 </div>
@@ -282,12 +325,12 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
           {/* Step 4: Select Language */}
           {step >= 4 && selectedGrade && (
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                {step > 4 && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                <Label className="text-lg font-semibold">Step 4: Assignment Language (Required)</Label>
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                {step > 4 && <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />}
+                <Label className="text-base sm:text-lg font-semibold">Step 4: Assignment Language (Required)</Label>
               </div>
               <Alert className="mb-4">
-                <AlertDescription>
+                <AlertDescription className="text-sm">
                   All content will be generated natively in the selected language. This is NOT a translation.
                 </AlertDescription>
               </Alert>
@@ -298,13 +341,14 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
                   if (step === 4) setStep(5);
                 }}
               >
-                <div className="grid grid-cols-2 gap-4">
+                {/* Mobile: stacked, Desktop: 2 columns */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {LANGUAGES.map((lang) => (
-                    <div key={lang.code} className="flex items-center space-x-2 border rounded p-3">
+                    <div key={lang.code} className="flex items-center space-x-3 border rounded p-3 min-h-[44px]">
                       <RadioGroupItem value={lang.code} id={`lang-${lang.code}`} />
-                      <Label htmlFor={`lang-${lang.code}`}>
-                        <div className="font-semibold">{lang.nativeName}</div>
-                        <div className="text-sm text-muted-foreground">{lang.name}</div>
+                      <Label htmlFor={`lang-${lang.code}`} className="cursor-pointer flex-1">
+                        <div className="font-semibold text-sm sm:text-base">{lang.nativeName}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">{lang.name}</div>
                       </Label>
                     </div>
                   ))}
@@ -316,33 +360,35 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
           {/* Step 5: Content Options */}
           {step >= 5 && selectedLanguage && (
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Label className="text-lg font-semibold">Step 5: Content Options</Label>
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <Label className="text-base sm:text-lg font-semibold">Step 5: Content Options</Label>
               </div>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex items-start sm:items-center space-x-3 border rounded p-3 min-h-[44px]">
                   <Checkbox
                     id="includeTables"
                     checked={includeTables}
                     onCheckedChange={(checked) => setIncludeTables(checked as boolean)}
+                    className="mt-0.5 sm:mt-0"
                   />
-                  <Label htmlFor="includeTables" className="cursor-pointer">
+                  <Label htmlFor="includeTables" className="cursor-pointer text-sm sm:text-base">
                     Include structured tables (for comparisons, checklists, summaries)
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start sm:items-center space-x-3 border rounded p-3 min-h-[44px]">
                   <Checkbox
                     id="includeImages"
                     checked={includeImages}
                     onCheckedChange={(checked) => setIncludeImages(checked as boolean)}
+                    className="mt-0.5 sm:mt-0"
                   />
-                  <Label htmlFor="includeImages" className="cursor-pointer">
+                  <Label htmlFor="includeImages" className="cursor-pointer text-sm sm:text-base">
                     Include image placeholders (with academic captions)
                   </Label>
                 </div>
               </div>
               {step === 5 && (
-                <Button className="mt-4" onClick={() => setStep(6)}>
+                <Button className="mt-4 w-full sm:w-auto min-h-[44px]" onClick={() => setStep(6)}>
                   Continue to Disclaimer
                 </Button>
               )}
@@ -352,10 +398,10 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
           {/* Step 6: Disclaimer */}
           {step >= 6 && (
             <div>
-              <Label className="text-lg font-semibold mb-4 block">Step 6: Educational Disclaimer</Label>
+              <Label className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 block">Step 6: Educational Disclaimer</Label>
               <Alert className="mb-4">
                 <AlertDescription>
-                  <div className="space-y-2">
+                  <div className="space-y-2 text-sm">
                     <p className="font-semibold">Educational Guidance Only</p>
                     <p>This platform is provided for educational guidance only.</p>
                     <p>The generated materials are learning aids, not final submissions.</p>
@@ -365,13 +411,14 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
                   </div>
                 </AlertDescription>
               </Alert>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-start sm:items-center space-x-3 border rounded p-3 min-h-[44px]">
                 <Checkbox
                   id="disclaimer"
                   checked={disclaimerAccepted}
                   onCheckedChange={(checked) => setDisclaimerAccepted(checked as boolean)}
+                  className="mt-0.5 sm:mt-0"
                 />
-                <Label htmlFor="disclaimer" className="cursor-pointer">
+                <Label htmlFor="disclaimer" className="cursor-pointer text-sm sm:text-base">
                   I understand and agree to these terms
                 </Label>
               </div>
@@ -388,13 +435,18 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
 
           {/* Generate Button */}
           {step >= 6 && (
-            <div className="flex justify-end gap-4">
-              <Button variant="outline" onClick={() => onNavigate('dashboard')}>
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-3 sm:gap-4 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                onClick={() => onNavigate('dashboard')}
+                className="w-full sm:w-auto min-h-[44px] order-2 sm:order-1"
+              >
                 Cancel
               </Button>
               <Button
                 onClick={handleGenerate}
                 disabled={!disclaimerAccepted || loading}
+                className="w-full sm:w-auto min-h-[44px] order-1 sm:order-2"
               >
                 {loading ? (
                   <>
@@ -409,6 +461,7 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }

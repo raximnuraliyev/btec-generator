@@ -48,7 +48,7 @@ export function AssignmentPreviewPage({ assignmentId, onNavigate }: AssignmentPr
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
+      <div className="container mx-auto py-4 md:py-8 px-4 max-w-4xl">
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
         </div>
@@ -58,10 +58,10 @@ export function AssignmentPreviewPage({ assignmentId, onNavigate }: AssignmentPr
 
   if (!content) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <Card className="p-12 text-center">
-          <p className="text-lg text-gray-600">Assignment not found</p>
-          <Button onClick={() => onNavigate('dashboard')} className="mt-4">
+      <div className="container mx-auto py-4 md:py-8 px-4 max-w-4xl">
+        <Card className="p-8 md:p-12 text-center">
+          <p className="text-base md:text-lg text-gray-600">Assignment not found</p>
+          <Button onClick={() => onNavigate('dashboard')} className="mt-4 min-h-[44px]">
             Back to Dashboard
           </Button>
         </Card>
@@ -72,29 +72,29 @@ export function AssignmentPreviewPage({ assignmentId, onNavigate }: AssignmentPr
   const allUnlocked = content.blocks.every((b) => unlockedSections.has(b.blockType));
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
+    <div className="container mx-auto py-4 md:py-8 px-4 max-w-4xl">
       {/* Header */}
-      <Card className="p-6 mb-6 bg-gradient-to-r from-blue-50 to-purple-50">
-        <div className="flex items-center justify-between mb-4">
+      <Card className="p-4 md:p-6 mb-4 md:mb-6 bg-gradient-to-r from-blue-50 to-purple-50">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-2xl font-bold mb-2">Assignment Preview</h1>
-            <p className="text-sm text-gray-600">
+            <h1 className="text-xl md:text-2xl font-bold mb-2">Assignment Preview</h1>
+            <p className="text-xs md:text-sm text-gray-600">
               Generated on {new Date(content.generatedAt).toLocaleString()}
             </p>
           </div>
-          <Badge className="text-lg px-4 py-2">
+          <Badge className="text-base md:text-lg px-3 md:px-4 py-1 md:py-2">
             {content.totalTokensUsed.toLocaleString()} tokens
           </Badge>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           {!allUnlocked ? (
-            <Button onClick={handleUnlockAll} className="flex items-center gap-2">
+            <Button onClick={handleUnlockAll} className="flex items-center justify-center gap-2 min-h-[44px]">
               <Eye className="h-4 w-4" />
               Unlock Full Preview
             </Button>
           ) : (
-            <Button onClick={handleDownload} className="flex items-center gap-2">
+            <Button onClick={handleDownload} className="flex items-center justify-center gap-2 min-h-[44px]">
               <Download className="h-4 w-4" />
               Download Assignment
             </Button>
@@ -103,7 +103,7 @@ export function AssignmentPreviewPage({ assignmentId, onNavigate }: AssignmentPr
       </Card>
 
       {/* Content Blocks */}
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {content.blocks
           .sort((a, b) => a.orderIndex - b.orderIndex)
           .map((block) => {
@@ -113,11 +113,11 @@ export function AssignmentPreviewPage({ assignmentId, onNavigate }: AssignmentPr
             return (
               <Card
                 key={block.id}
-                className={`p-6 relative ${isLocked ? 'border-orange-300' : ''}`}
+                className={`p-4 md:p-6 relative ${isLocked ? 'border-orange-300' : ''}`}
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold capitalize">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg md:text-xl font-bold capitalize">
                       {block.blockType.replace(/_/g, ' ')}
                     </h2>
                     {isLocked && (
@@ -146,7 +146,7 @@ export function AssignmentPreviewPage({ assignmentId, onNavigate }: AssignmentPr
                   <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/90 flex items-end justify-center pb-6">
                     <Button
                       variant="outline"
-                      className="bg-white shadow-lg"
+                      className="bg-white shadow-lg min-h-[44px]"
                       onClick={() => {
                         const newUnlocked = new Set(unlockedSections);
                         newUnlocked.add(block.blockType);
@@ -164,22 +164,22 @@ export function AssignmentPreviewPage({ assignmentId, onNavigate }: AssignmentPr
       </div>
 
       {/* Summary Card */}
-      <Card className="p-6 mt-6 bg-gray-50">
+      <Card className="p-4 md:p-6 mt-4 md:mt-6 bg-gray-50">
         <h3 className="font-bold mb-3">Generation Summary</h3>
-        <div className="grid md:grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-3 gap-3 md:gap-4 text-sm">
           <div>
-            <p className="text-gray-600">Total Blocks</p>
-            <p className="text-2xl font-bold">{content.blocks.length}</p>
+            <p className="text-gray-600 text-xs md:text-sm">Total Blocks</p>
+            <p className="text-xl md:text-2xl font-bold">{content.blocks.length}</p>
           </div>
           <div>
-            <p className="text-gray-600">Unlocked</p>
-            <p className="text-2xl font-bold">
+            <p className="text-gray-600 text-xs md:text-sm">Unlocked</p>
+            <p className="text-xl md:text-2xl font-bold">
               {unlockedSections.size} / {content.blocks.length}
             </p>
           </div>
           <div>
-            <p className="text-gray-600">Total Tokens</p>
-            <p className="text-2xl font-bold">{content.totalTokensUsed.toLocaleString()}</p>
+            <p className="text-gray-600 text-xs md:text-sm">Total Tokens</p>
+            <p className="text-xl md:text-2xl font-bold">{content.totalTokensUsed.toLocaleString()}</p>
           </div>
         </div>
       </Card>

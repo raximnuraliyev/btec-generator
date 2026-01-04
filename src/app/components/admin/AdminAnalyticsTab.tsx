@@ -121,21 +121,21 @@ export function AdminAnalyticsTab() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
           <BarChart3 className="w-5 h-5" />
           Analytics Dashboard
         </h2>
-        <Button onClick={loadAnalytics} variant="outline" className="border-2 border-black">
+        <Button onClick={loadAnalytics} variant="outline" className="border-2 border-black min-h-[44px]">
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
         </Button>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
         <StatCard 
           label="Total Users"
           value={analytics?.userGrowth?.total || 0}
@@ -162,42 +162,44 @@ export function AdminAnalyticsTab() {
       </div>
 
       {/* Token Usage Chart */}
-      <div className="bg-white border-2 border-black p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="font-bold text-lg">Token Usage Over Time</h3>
-          <div className="flex border-2 border-black rounded overflow-hidden">
-            {([{ value: '24h', label: 'Daily' }, { value: '7d', label: 'Weekly' }, { value: '30d', label: 'Monthly' }, { value: '90d', label: '90 Days' }, { value: '1y', label: 'Yearly' }] as const).map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setTokenPeriod(value as '24h' | '7d' | '30d' | '90d' | '1y')}
-                className={`px-4 py-2 text-sm ${
-                  tokenPeriod === value 
-                    ? 'bg-black text-white' 
-                    : 'hover:bg-gray-100'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+      <div className="bg-white border-2 border-black p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
+          <h3 className="font-bold text-base md:text-lg">Token Usage Over Time</h3>
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex border-2 border-black rounded overflow-hidden min-w-max">
+              {([{ value: '24h', label: 'Daily' }, { value: '7d', label: 'Weekly' }, { value: '30d', label: 'Monthly' }, { value: '90d', label: '90d' }, { value: '1y', label: 'Yearly' }] as const).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setTokenPeriod(value as '24h' | '7d' | '30d' | '90d' | '1y')}
+                  className={`px-3 md:px-4 py-2 text-sm min-h-[44px] ${
+                    tokenPeriod === value 
+                      ? 'bg-black text-white' 
+                      : 'hover:bg-gray-100'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         
         {analytics?.tokenUsage?.byPeriod && analytics.tokenUsage.byPeriod.length > 0 ? (
-          <div className="h-64">
+          <div className="h-48 md:h-64">
             <SimpleBarChart data={analytics.tokenUsage.byPeriod} />
           </div>
         ) : (
-          <div className="h-64 flex items-center justify-center text-gray-500">
+          <div className="h-48 md:h-64 flex items-center justify-center text-gray-500">
             No token usage data available
           </div>
         )}
       </div>
 
       {/* Distribution Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {/* Grade Distribution */}
-        <div className="bg-white border-2 border-black p-6">
-          <h3 className="font-bold text-lg mb-4">Assignments by Grade</h3>
+        <div className="bg-white border-2 border-black p-4 md:p-6">
+          <h3 className="font-bold text-base md:text-lg mb-4">Assignments by Grade</h3>
           {analytics?.assignmentStats?.byGrade ? (
             <div className="space-y-3">
               {Object.entries(analytics.assignmentStats.byGrade).map(([grade, count]) => {
@@ -229,8 +231,8 @@ export function AdminAnalyticsTab() {
         </div>
 
         {/* Level Distribution */}
-        <div className="bg-white border-2 border-black p-6">
-          <h3 className="font-bold text-lg mb-4">Assignments by Level</h3>
+        <div className="bg-white border-2 border-black p-4 md:p-6">
+          <h3 className="font-bold text-base md:text-lg mb-4">Assignments by Level</h3>
           {analytics?.assignmentStats?.byLevel ? (
             <div className="space-y-3">
               {Object.entries(analytics.assignmentStats.byLevel).map(([level, count]) => {
@@ -259,14 +261,14 @@ export function AdminAnalyticsTab() {
       </div>
 
       {/* User Distribution */}
-      <div className="bg-white border-2 border-black p-6">
-        <h3 className="font-bold text-lg mb-4">Users by Role</h3>
+      <div className="bg-white border-2 border-black p-4 md:p-6">
+        <h3 className="font-bold text-base md:text-lg mb-4">Users by Role</h3>
         {analytics?.userGrowth?.byRole ? (
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             {Object.entries(analytics.userGrowth.byRole).map(([role, count]) => (
-              <div key={role} className="text-center p-4 bg-gray-50 rounded">
-                <p className="text-3xl font-bold">{count}</p>
-                <p className="text-sm text-gray-600">{role}</p>
+              <div key={role} className="text-center p-3 md:p-4 bg-gray-50 rounded">
+                <p className="text-2xl md:text-3xl font-bold">{count}</p>
+                <p className="text-xs md:text-sm text-gray-600">{role}</p>
               </div>
             ))}
           </div>
@@ -277,31 +279,31 @@ export function AdminAnalyticsTab() {
 
       {/* Generation Stats */}
       {analytics?.generationStats && (
-        <div className="bg-white border-2 border-black p-6">
-          <h3 className="font-bold text-lg mb-4">Generation Performance</h3>
-          <div className="grid grid-cols-2 gap-6">
+        <div className="bg-white border-2 border-black p-4 md:p-6">
+          <h3 className="font-bold text-base md:text-lg mb-4">Generation Performance</h3>
+          <div className="grid grid-cols-2 gap-4 md:gap-6">
             <div>
-              <p className="text-sm text-gray-500">Average Generation Time</p>
-              <p className="text-2xl font-bold">
+              <p className="text-xs md:text-sm text-gray-500">Avg Generation Time</p>
+              <p className="text-xl md:text-2xl font-bold">
                 {analytics.generationStats.avgTime 
                   ? `${Math.round(analytics.generationStats.avgTime / 1000)}s` 
                   : 'N/A'}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Success Rate</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-xs md:text-sm text-gray-500">Success Rate</p>
+              <p className="text-xl md:text-2xl font-bold text-green-600">
                 {((analytics.generationStats.successRate || 0) * 100).toFixed(1)}%
               </p>
             </div>
           </div>
           
           {analytics.generationStats.failureReasons && analytics.generationStats.failureReasons.length > 0 && (
-            <div className="mt-6 pt-4 border-t">
-              <h4 className="font-medium mb-3">Common Failure Reasons</h4>
+            <div className="mt-4 md:mt-6 pt-4 border-t">
+              <h4 className="font-medium mb-3 text-sm md:text-base">Common Failure Reasons</h4>
               <div className="space-y-2">
                 {analytics.generationStats.failureReasons.map((item, index) => (
-                  <div key={index} className="flex justify-between text-sm">
+                  <div key={index} className="flex justify-between text-xs md:text-sm">
                     <span className="text-gray-600">{item.reason}</span>
                     <span className="font-mono">{item.count}</span>
                   </div>
@@ -313,52 +315,54 @@ export function AdminAnalyticsTab() {
       )}
 
       {/* Weekly/Monthly Recap */}
-      <div className="bg-white border-2 border-black p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="font-bold text-lg flex items-center gap-2">
+      <div className="bg-white border-2 border-black p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
+          <h3 className="font-bold text-base md:text-lg flex items-center gap-2">
             <Calendar className="w-5 h-5" />
             Period Recap
           </h3>
-          <div className="flex border-2 border-black rounded overflow-hidden">
-            {([{ value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly' }] as const).map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setRecapPeriod(value as 'weekly' | 'monthly' | 'yearly')}
-                className={`px-4 py-2 text-sm ${
-                  recapPeriod === value 
-                    ? 'bg-black text-white' 
-                    : 'hover:bg-gray-100'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex border-2 border-black rounded overflow-hidden min-w-max">
+              {([{ value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly' }] as const).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setRecapPeriod(value as 'weekly' | 'monthly' | 'yearly')}
+                  className={`px-3 md:px-4 py-2 text-sm min-h-[44px] ${
+                    recapPeriod === value 
+                      ? 'bg-black text-white' 
+                      : 'hover:bg-gray-100'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {recap ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-gray-50 p-4 rounded">
-              <h4 className="font-medium mb-3">Assignments</h4>
-              <p className="text-3xl font-bold mb-2">{recap.current?.totalAssignments || recap.assignments?.total || 0}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+            <div className="bg-gray-50 p-3 md:p-4 rounded">
+              <h4 className="font-medium mb-2 md:mb-3 text-sm md:text-base">Assignments</h4>
+              <p className="text-2xl md:text-3xl font-bold mb-2">{recap.current?.totalAssignments || recap.assignments?.total || 0}</p>
               {(recap.current?.assignmentsByGrade || recap.assignments?.byGrade) && (
-                <div className="text-sm text-gray-600 space-y-1">
+                <div className="text-xs md:text-sm text-gray-600 space-y-1">
                   {Object.entries(recap.current?.assignmentsByGrade || recap.assignments?.byGrade || {}).map(([grade, count]) => (
                     <p key={grade}>{grade}: {String(count)}</p>
                   ))}
                 </div>
               )}
             </div>
-            <div className="bg-gray-50 p-4 rounded">
-              <h4 className="font-medium mb-3">Users</h4>
-              <div className="space-y-2">
+            <div className="bg-gray-50 p-3 md:p-4 rounded">
+              <h4 className="font-medium mb-2 md:mb-3 text-sm md:text-base">Users</h4>
+              <div className="space-y-1 md:space-y-2 text-sm">
                 <p><span className="text-gray-600">New:</span> <strong>{recap.current?.newUsers || recap.users?.newRegistrations || 0}</strong></p>
                 <p><span className="text-gray-600">Active:</span> <strong>{recap.users?.activeUsers || 0}</strong></p>
               </div>
             </div>
-            <div className="bg-gray-50 p-4 rounded">
-              <h4 className="font-medium mb-3">Tokens</h4>
-              <div className="space-y-2">
+            <div className="bg-gray-50 p-3 md:p-4 rounded">
+              <h4 className="font-medium mb-2 md:mb-3 text-sm md:text-base">Tokens</h4>
+              <div className="space-y-1 md:space-y-2 text-sm">
                 <p><span className="text-gray-600">Consumed:</span> <strong>{recap.tokens?.consumed || 0}</strong></p>
                 <p><span className="text-gray-600">Purchased:</span> <strong>{recap.tokens?.purchased || 0}</strong></p>
               </div>
@@ -389,18 +393,18 @@ function StatCard({
   highlight?: boolean;
 }) {
   return (
-    <div className={`border-2 p-6 ${highlight ? 'border-green-500 bg-green-50' : 'border-black bg-white'}`}>
+    <div className={`border-2 p-4 md:p-6 ${highlight ? 'border-green-500 bg-green-50' : 'border-black bg-white'}`}>
       <div className="flex items-center justify-between mb-2">
-        <Icon className="w-6 h-6 text-gray-400" />
+        <Icon className="w-5 h-5 md:w-6 md:h-6 text-gray-400" />
         {change !== undefined && change > 0 && (
-          <span className="flex items-center text-green-600 text-sm">
-            <TrendingUp className="w-4 h-4 mr-1" />
+          <span className="flex items-center text-green-600 text-xs md:text-sm">
+            <TrendingUp className="w-3 h-3 md:w-4 md:h-4 mr-1" />
             +{change}
           </span>
         )}
       </div>
-      <p className="text-3xl font-bold">{typeof value === 'number' ? value.toLocaleString() : value}</p>
-      <p className="text-sm text-gray-600">{label}</p>
+      <p className="text-xl md:text-3xl font-bold">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+      <p className="text-xs md:text-sm text-gray-600">{label}</p>
       {changeLabel && change !== undefined && (
         <p className="text-xs text-gray-400 mt-1">{changeLabel}</p>
       )}

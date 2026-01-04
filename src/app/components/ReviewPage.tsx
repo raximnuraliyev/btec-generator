@@ -98,7 +98,7 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
           <p>Assignment not found</p>
           <Button
             onClick={() => onNavigate('dashboard')}
-            className="mt-4 bg-black text-white"
+            className="mt-4 bg-black text-white min-h-[44px]"
           >
             Back to Dashboard
           </Button>
@@ -117,21 +117,21 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
       
       {/* Header */}
       <header className="border-b-2 border-black">
-        <div className="max-w-6xl mx-auto px-6 py-4">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4">
           <Button
             onClick={() => onNavigate('dashboard')}
             variant="ghost"
-            className="mb-2 hover:bg-gray-100 flex items-center gap-2"
+            className="mb-2 hover:bg-gray-100 flex items-center gap-2 min-h-[44px]"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </Button>
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl" style={{ fontWeight: 700 }}>
+              <h1 className="text-2xl md:text-3xl" style={{ fontWeight: 700 }}>
                 {assignment.title}
               </h1>
-              <p className="mt-2 text-gray-600">
+              <p className="mt-2 text-gray-600 text-sm md:text-base">
                 Generated assignment ready for review
               </p>
             </div>
@@ -139,15 +139,20 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
               <Button
                 onClick={handleExportClick}
                 disabled={isExporting || !canDownload}
-                className="bg-black text-white px-6 hover:bg-gray-800 border-0 flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="bg-black text-white px-4 md:px-6 hover:bg-gray-800 border-0 flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[44px] flex-1 md:flex-none"
               >
                 {canDownload ? <CheckCircle className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-                {isExporting ? 'Downloading...' : canDownload ? 'Download .DOCX' : 'Not Ready'}
+                <span className="hidden sm:inline">
+                  {isExporting ? 'Downloading...' : canDownload ? 'Download .DOCX' : 'Not Ready'}
+                </span>
+                <span className="sm:hidden">
+                  {isExporting ? '...' : canDownload ? 'Download' : 'Wait'}
+                </span>
               </Button>
               <Button
                 onClick={handleDelete}
                 variant="outline"
-                className="border-2 border-black bg-white hover:bg-black hover:text-white transition-colors"
+                className="border-2 border-black bg-white hover:bg-black hover:text-white transition-colors min-h-[44px] min-w-[44px]"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -157,19 +162,19 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-12">
+      <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-12">
         
         {/* Warning Banner */}
-        <div className="bg-black text-white p-6 mb-8 flex gap-4">
-          <TriangleAlert className="w-6 h-6 flex-shrink-0 mt-1" />
+        <div className="bg-black text-white p-4 md:p-6 mb-6 md:mb-8 flex flex-col sm:flex-row gap-4">
+          <TriangleAlert className="w-6 h-6 flex-shrink-0" />
           <div>
-            <h2 className="text-xl mb-2" style={{ fontWeight: 600 }}>
+            <h2 className="text-lg md:text-xl mb-2" style={{ fontWeight: 600 }}>
               Manual Review Required
             </h2>
-            <p className="mb-3">
+            <p className="mb-3 text-sm md:text-base">
               This assignment was AI-generated and MUST be manually reviewed before submission.
             </p>
-            <ul className="text-sm space-y-1">
+            <ul className="text-xs md:text-sm space-y-1">
               <li>✓ Verify all content matches your assignment brief requirements</li>
               <li>✓ Check all facts, statistics, and references for accuracy</li>
               <li>✓ Ensure examples and case studies are relevant and correct</li>
@@ -180,7 +185,7 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
         </div>
 
         {/* Writing Guidance Section */}
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
           <WritingGuidance 
             grade={assignment.targetGrade} 
             level={assignment.level}
@@ -188,13 +193,13 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           
           {/* Left Sidebar - Metadata */}
-          <div className="col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-6 order-2 lg:order-1">
             
             {/* Assignment Info */}
-            <div className="border-2 border-black p-6">
+            <div className="border-2 border-black p-4 md:p-6">
               <h3 className="text-lg mb-4" style={{ fontWeight: 600 }}>
                 Assignment Details
               </h3>
@@ -223,7 +228,7 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
             </div>
 
             {/* Section Navigator */}
-            <div className="border-2 border-black p-6">
+            <div className="border-2 border-black p-4 md:p-6">
               <h3 className="text-lg mb-4" style={{ fontWeight: 600 }}>
                 Sections
               </h3>
@@ -250,9 +255,9 @@ export function ReviewPage({ assignmentId, onNavigate }: ReviewPageProps) {
           </div>
 
           {/* Main Content - Preview */}
-          <div className="col-span-2">
-            <div className="border-2 border-black p-8">
-              <h2 className="text-2xl mb-6" style={{ fontWeight: 600 }}>
+          <div className="lg:col-span-2 order-1 lg:order-2">
+            <div className="border-2 border-black p-4 md:p-8">
+              <h2 className="text-xl md:text-2xl mb-4 md:mb-6" style={{ fontWeight: 600 }}>
                 Content Preview
               </h2>
 

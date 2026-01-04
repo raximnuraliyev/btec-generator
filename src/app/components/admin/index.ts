@@ -4,3 +4,4 @@ export { AdminAssignmentsTab } from './AdminAssignmentsTab';
 export { AdminIssuesTab } from './AdminIssuesTab';
 export { AdminAnalyticsTab } from './AdminAnalyticsTab';
 export { AdminLogsTab } from './AdminLogsTab';
+export { AdminPaymentsTab } from './AdminPaymentsTab';

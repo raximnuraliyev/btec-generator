@@ -393,6 +393,73 @@ export const deleteAssignment = async (
   }
 };
 
+// =============================================================================
+// BULK ACTIONS
+// =============================================================================
+
+export const bulkDeleteAssignments = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: 'Bad Request', message: 'No assignment IDs provided' } as APIError);
+      return;
+    }
+
+    // Delete related records first, then assignments
+    await prisma.$transaction([
+      prisma.contentBlock.deleteMany({ where: { assignmentId: { in: ids } } }),
+      prisma.generationPlan.deleteMany({ where: { assignmentId: { in: ids } } }),
+      prisma.assignment.deleteMany({ where: { id: { in: ids } } }),
+    ]);
+
+    res.status(200).json({ success: true, deleted: ids.length });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const bulkRegenerateAssignments = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: 'Bad Request', message: 'No assignment IDs provided' } as APIError);
+      return;
+    }
+
+    // Reset all assignments for regeneration
+    await prisma.$transaction([
+      prisma.contentBlock.deleteMany({ where: { assignmentId: { in: ids } } }),
+      prisma.generationPlan.deleteMany({ where: { assignmentId: { in: ids } } }),
+      prisma.assignment.updateMany({
+        where: { id: { in: ids } },
+        data: {
+          status: 'DRAFT',
+          error: null,
+          content: Prisma.JsonNull,
+          guidance: Prisma.JsonNull,
+          totalTokensUsed: 0,
+          totalAiCalls: 0,
+          generationDurationMs: null,
+          completedAt: null,
+          docxUrl: null,
+        },
+      }),
+    ]);
+
+    res.status(200).json({ success: true, regenerated: ids.length });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const downloadAssignment = async (
   req: AuthRequest,
   res: Response,
@@ -690,6 +757,139 @@ export const getSystemStatus = async (
         { model: aiModel, status: 'healthy', failRate: 0 },
       ],
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =============================================================================
+// EXPORT ENDPOINTS
+// =============================================================================
+
+export const exportAssignments = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { ids, status, grade, level, search, dateFrom, dateTo } = req.query;
+    
+    // Build where clause
+    const where: any = {};
+    
+    // If specific IDs provided, export only those
+    if (ids) {
+      const idArray = Array.isArray(ids) ? ids : (ids as string).split(',');
+      where.id = { in: idArray };
+    } else {
+      // Otherwise use filters
+      if (status) where.status = status;
+      if (grade) where.grade = grade;
+      if (level) where.snapshot = { path: ['level'], equals: parseInt(level as string) };
+      if (dateFrom || dateTo) {
+        where.createdAt = {};
+        if (dateFrom) where.createdAt.gte = new Date(dateFrom as string);
+        if (dateTo) where.createdAt.lte = new Date(dateTo as string);
+      }
+      if (search) {
+        where.OR = [
+          { snapshot: { path: ['unitName'], string_contains: search } },
+          { user: { email: { contains: search as string } } },
+        ];
+      }
+    }
+
+    const assignments = await prisma.assignment.findMany({
+      where,
+      include: {
+        user: { select: { email: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 1000, // Limit to prevent huge exports
+    });
+
+    // Generate CSV
+    const headers = ['ID', 'Unit Name', 'Unit Number', 'Level', 'Grade', 'Status', 'User Email', 'User Name', 'Created At', 'Completed At'];
+    const rows = assignments.map(a => {
+      const snapshotData = (a as any).snapshot as any || {};
+      return [
+        a.id,
+        snapshotData?.unitName || '',
+        snapshotData?.unitNumber || '',
+        snapshotData?.level || '',
+        a.grade,
+        a.status,
+        a.user?.email || '',
+        a.user?.name || '',
+        a.createdAt.toISOString(),
+        (a as any).completedAt?.toISOString() || '',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+
+    const csv = [headers.join(','), ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="assignments-export-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.status(200).send(csv);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const exportUsers = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { role, status, search, dateFrom, dateTo } = req.query;
+    
+    // Build where clause
+    const where: any = {};
+    if (role) where.role = role;
+    if (status) where.status = status;
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom as string);
+      if (dateTo) where.createdAt.lte = new Date(dateTo as string);
+    }
+    if (search) {
+      where.OR = [
+        { email: { contains: search as string } },
+        { name: { contains: search as string } },
+      ];
+    }
+
+    const users = await prisma.user.findMany({
+      where,
+      include: {
+        studentProfile: true,
+        tokenPlan: true,
+        _count: { select: { assignments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+    });
+
+    // Generate CSV
+    const headers = ['ID', 'Email', 'Name', 'Role', 'Status', 'University', 'Tokens Remaining', 'Total Assignments', 'Created At'];
+    const rows = users.map(u => [
+      u.id,
+      u.email,
+      u.name || '',
+      u.role,
+      u.status,
+      u.studentProfile?.universityName || '',
+      u.tokenPlan?.tokensRemaining || 0,
+      u._count.assignments,
+      u.createdAt.toISOString(),
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+
+    const csv = [headers.join(','), ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="users-export-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.status(200).send(csv);
   } catch (error) {
     next(error);
   }

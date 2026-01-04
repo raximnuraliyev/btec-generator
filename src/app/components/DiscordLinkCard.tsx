@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 // Discord Bot Invite Link (replace with actual)
-const DISCORD_BOT_LINK = 'https://discord.com/oauth2/authorize?client_id=1451221342945808448&permissions=8&integration_type=0&scope=bot';
+const DISCORD_SERVER_LINK = 'https://discord.gg/wjPGhY6X';
 
 export function DiscordLinkCard() {
   const [status, setStatus] = useState<DiscordStatus | null>(null);
@@ -188,12 +188,24 @@ export function DiscordLinkCard() {
             </div>
 
             <div className="text-sm text-muted-foreground space-y-1">
-              <p>✓ You will receive DM notifications for:</p>
+              <p className="font-medium text-foreground">✓ You will receive DM notifications for:</p>
               <ul className="ml-4 space-y-1">
-                <li>• Assignment generation progress</li>
-                <li>• Completion notifications</li>
-                <li>• Error alerts</li>
+                <li>• Payment approvals/rejections</li>
+                <li>• Assignment completion</li>
+                <li>• Token balance warnings</li>
               </ul>
+            </div>
+
+            <div className="text-sm space-y-2 p-3 bg-muted rounded-lg">
+              <p className="font-medium">📌 Available Bot Commands:</p>
+              <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground font-mono">
+                <span>!help</span><span>Show all commands</span>
+                <span>!profile</span><span>View your profile</span>
+                <span>!tokens</span><span>Check token balance</span>
+                <span>!assignments</span><span>List your assignments</span>
+                <span>!payments</span><span>View payment history</span>
+                <span>!support</span><span>Get support info</span>
+              </div>
             </div>
           </div>
         ) : status?.activeCode ? (
@@ -291,7 +303,7 @@ export function DiscordLinkCard() {
           </Button>
         ) : (
           <a 
-            href={DISCORD_BOT_LINK}
+            href={DISCORD_SERVER_LINK}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full"

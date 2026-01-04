@@ -99,25 +99,25 @@ export function BriefManagementPage({ onNavigate }: BriefManagementPageProps) {
   const canEdit = user?.role === 'ADMIN' || user?.role === 'TEACHER';
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="container mx-auto py-4 md:py-8 px-4 max-w-7xl">
       <div className="mb-4">
         <Button
           variant="outline"
           onClick={() => onNavigate(user?.role === 'TEACHER' ? 'teacher' : 'dashboard')}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 min-h-[44px]"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to {user?.role === 'TEACHER' ? 'Teacher Dashboard' : 'Dashboard'}
         </Button>
       </div>
       
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <FileText className="h-8 w-8 text-blue-600" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 md:mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+          <FileText className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
           Brief Management
         </h1>
         {canEdit && (
-          <Button onClick={handleCreate} className="flex items-center gap-2">
+          <Button onClick={handleCreate} className="flex items-center gap-2 min-h-[44px] w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             Create Brief
           </Button>
@@ -125,8 +125,8 @@ export function BriefManagementPage({ onNavigate }: BriefManagementPageProps) {
       </div>
 
       {/* Filters */}
-      <Card className="p-4 mb-6">
-        <div className="flex gap-4 flex-wrap">
+      <Card className="p-4 mb-4 md:mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -134,14 +134,15 @@ export function BriefManagementPage({ onNavigate }: BriefManagementPageProps) {
                 placeholder="Search briefs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 min-h-[44px]"
               />
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 -mx-1 px-1">
             <Button
               variant={selectedLevel === null ? 'default' : 'outline'}
               onClick={() => setSelectedLevel(null)}
+              className="min-h-[44px] whitespace-nowrap flex-shrink-0"
             >
               All Levels
             </Button>
@@ -150,6 +151,7 @@ export function BriefManagementPage({ onNavigate }: BriefManagementPageProps) {
                 key={level}
                 variant={selectedLevel === level ? 'default' : 'outline'}
                 onClick={() => setSelectedLevel(level)}
+                className="min-h-[44px] flex-shrink-0"
               >
                 Level {level}
               </Button>
@@ -160,9 +162,9 @@ export function BriefManagementPage({ onNavigate }: BriefManagementPageProps) {
 
       {/* Briefs List */}
       {loading ? (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="p-6 animate-pulse">
+            <Card key={i} className="p-4 md:p-6 animate-pulse">
               <div className="h-6 bg-gray-200 rounded mb-2"></div>
               <div className="h-4 bg-gray-200 rounded mb-4"></div>
               <div className="h-20 bg-gray-200 rounded"></div>
@@ -170,38 +172,38 @@ export function BriefManagementPage({ onNavigate }: BriefManagementPageProps) {
           ))}
         </div>
       ) : filteredBriefs.length === 0 ? (
-        <Card className="p-12 text-center">
-          <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-lg text-gray-600 mb-2">No briefs found</p>
+        <Card className="p-8 md:p-12 text-center">
+          <FileText className="h-12 w-12 md:h-16 md:w-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-base md:text-lg text-gray-600 mb-2">No briefs found</p>
           <p className="text-sm text-gray-500 mb-4">
             {searchTerm
               ? 'Try adjusting your search filters'
               : 'Create your first brief to get started'}
           </p>
           {canEdit && (
-            <Button onClick={handleCreate}>
+            <Button onClick={handleCreate} className="min-h-[44px]">
               <Plus className="h-4 w-4 mr-2" />
               Create Brief
             </Button>
           )}
         </Card>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBriefs.map((brief) => (
-            <Card key={brief.id} className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg mb-1">{brief.unitName}</h3>
+            <Card key={brief.id} className="p-4 md:p-6 hover:shadow-lg transition-shadow">
+              <div className="flex items-start justify-between mb-3 gap-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-base md:text-lg mb-1 truncate">{brief.unitName}</h3>
                   <p className="text-sm text-gray-600">{brief.unitCode}</p>
                 </div>
-                <Badge>Level {brief.level}</Badge>
+                <Badge className="flex-shrink-0">Level {brief.level}</Badge>
               </div>
 
               <p className="text-sm text-gray-700 mb-4 line-clamp-3">
                 {brief.vocationalScenario || 'No scenario provided'}
               </p>
 
-              <div className="flex items-center gap-2 text-xs text-gray-600 mb-4">
+              <div className="flex items-center gap-2 text-xs text-gray-600 mb-4 flex-wrap">
                 <span>{brief.learningAims.length} aims</span>
                 <span>•</span>
                 <span>
@@ -217,20 +219,20 @@ export function BriefManagementPage({ onNavigate }: BriefManagementPageProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 min-h-[44px]"
                     onClick={() => handleEdit(brief)}
                   >
-                    <Edit className="h-3 w-3 mr-1" />
+                    <Edit className="h-4 w-4 mr-1" />
                     Edit
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-red-600 hover:bg-red-50"
+                    className="text-red-600 hover:bg-red-50 min-h-[44px] min-w-[44px]"
                     onClick={() => handleDelete(brief.id)}
                     disabled={deleting === brief.id}
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               )}
@@ -289,7 +291,7 @@ function BriefEditorDialog({ brief, onClose, onSaved }: BriefEditorDialogProps) 
       toast.error('Unit name must be at least 5 characters');
       return;
     }
-    if (formData.scenario.length < 50) {
+    if (formData.vocationalScenario.length < 50) {
       toast.error('Scenario must be at least 50 characters');
       return;
     }

@@ -60,6 +60,7 @@ enum TokenPlanType {
   FREE
   BASIC
   PRO
+  PAID
   UNLIMITED
 }
 
@@ -88,6 +89,7 @@ model User {
   email                     String             @unique
   password                  String
   name                      String?
+  discordId                 String?            @unique  // Discord user ID for bot linking
   role                      UserRole           @default(USER)
   status                    UserStatus         @default(ACTIVE)
   totalTokensUsedAllTime    Int                @default(0)
@@ -102,12 +104,14 @@ model User {
   assignments         Assignment[]
   tokenPlan           TokenPlan?
   tokenTransactions   TokenTransaction[]
+  paymentTransactions PaymentTransaction[]
   issues              Issue[]
   aiUsageLogs         AIUsageLog[]
   
   @@index([email])
   @@index([role])
   @@index([status])
+  @@index([discordId])
 }
 
 // =============================================================================
@@ -411,6 +415,83 @@ model TokenTransaction {
 }
 
 // =============================================================================
+// PAYMENT ENUMS
+// =============================================================================
+
+enum PaymentStatus {
+  WAITING_PAYMENT
+  PAID
+  REJECTED
+  EXPIRED
+}
+
+enum PaymentMethod {
+  HUMO
+  UZCARD
+  PAYME
+}
+
+enum PaymentPlanType {
+  P        // Pass only - 30,000 UZS
+  PM       // Pass + Merit - 50,000 UZS
+  PMD      // Pass + Merit + Distinction - 70,000 UZS
+  CUSTOM   // Custom token amount
+}
+
+// =============================================================================
+// PAYMENT TRANSACTION MODEL
+// =============================================================================
+// Manual payment tracking with unique suffix matching
+
+model PaymentTransaction {
+  id                String          @id @default(uuid())
+  userId            String
+  
+  // Plan details
+  planType          PaymentPlanType
+  
+  // For custom plans
+  customTokens      Int?            // Token amount for custom plan
+  customGrade       Grade?          // Grade for custom plan
+  
+  // Payment amounts
+  baseAmount        Int             // Base price in UZS (e.g., 50000)
+  uniqueSuffix      Int             // Unique 2-digit suffix (01-99)
+  finalAmount       Float           // baseAmount + suffix/100 (e.g., 50000.37)
+  
+  // Payment method
+  paymentMethod     PaymentMethod   @default(HUMO)
+  
+  // Status tracking
+  status            PaymentStatus   @default(WAITING_PAYMENT)
+  
+  // Timestamps
+  createdAt         DateTime        @default(now())
+  expiresAt         DateTime        // 24 hours from creation
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  
+  // Admin who approved/rejected
+  approvedByAdminId String?
+  rejectionReason   String?
+  
+  // Plan activation details (set when approved)
+  assignmentsGranted   Int?         // Number of assignments granted
+  tokensGranted        Int?         // Tokens granted
+  gradesGranted        String[]     @default([])  // ["PASS", "MERIT", "DISTINCTION"]
+  planExpiresAt        DateTime?    // When the activated plan expires
+  
+  // Relations
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
+  @@index([finalAmount])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
+// =============================================================================
 // ISSUE MODEL
 // =============================================================================
 // User support tickets
@@ -478,4 +559,16 @@ model AuditLog {
   @@index([adminUserId])
   @@index([action])
   @@index([createdAt])
+}
+
+// =============================================================================
+// SYSTEM SETTINGS MODEL
+// =============================================================================
+// Key-value store for system configuration
+
+model SystemSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+  updatedBy String?  // Discord ID or User ID of who last updated
 }

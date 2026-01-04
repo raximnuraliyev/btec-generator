@@ -39,6 +39,15 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  
+  /* Responsive spacing variables */
+  --spacing-page-x: 1rem;
+  --spacing-page-y: 2rem;
+  --spacing-section: 1.5rem;
+  --spacing-card: 1rem;
+  
+  /* Min touch target for accessibility */
+  --min-touch-target: 44px;
 }
 
 .dark {
@@ -131,10 +140,56 @@
   /**
   * Default typography styles for HTML elements (h1-h4, p, label, button, input).
   * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
+  * 
+  * Responsive Typography (per specification):
+  * - Desktop: 16px base
+  * - Tablet: 15px base
+  * - Mobile: 14px minimum
+  * - Line height: 1.4-1.6 always
   */
 
   html {
     font-size: var(--font-size);
+    /* Prevent font scaling issues on orientation change in iOS */
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  /* Responsive base font size */
+  @media (max-width: 1023px) {
+    html {
+      font-size: 15px;
+    }
+  }
+  
+  @media (max-width: 767px) {
+    html {
+      font-size: 14px;
+    }
+    
+    :root {
+      --spacing-page-x: 1rem;
+      --spacing-page-y: 1.5rem;
+      --spacing-section: 1rem;
+      --spacing-card: 0.75rem;
+    }
+  }
+  
+  @media (min-width: 768px) and (max-width: 1023px) {
+    :root {
+      --spacing-page-x: 1.5rem;
+      --spacing-page-y: 2rem;
+      --spacing-section: 1.25rem;
+      --spacing-card: 1rem;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    :root {
+      --spacing-page-x: 2rem;
+      --spacing-page-y: 3rem;
+      --spacing-section: 2rem;
+      --spacing-card: 1.5rem;
+    }
   }
 
   h1 {
@@ -177,5 +232,24 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
+  }
+  
+  /* Ensure minimum touch target size for interactive elements */
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: var(--min-touch-target);
+  }
+  
+  /* Mobile-specific: Ensure inputs are large enough to tap */
+  @media (max-width: 767px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px; /* Prevents iOS zoom on focus */
+      min-height: var(--min-touch-target);
+    }
   }
 }

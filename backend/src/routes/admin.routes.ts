@@ -24,7 +24,11 @@ import {
   cancelAssignment,
   regenerateAssignment,
   deleteAssignment,
+  bulkDeleteAssignments,
+  bulkRegenerateAssignments,
   downloadAssignment,
+  exportAssignments,
+  exportUsers,
   briefs,
   aiAnalytics,
   getTokenAnalytics,
@@ -103,6 +107,10 @@ router.post('/assignments/:id/cancel', cancelAssignment);
 router.post('/assignments/:id/regenerate', regenerateAssignment);
 router.delete('/assignments/:id', deleteAssignment);
 
+// Bulk actions
+router.post('/assignments/bulk-delete', bulkDeleteAssignments);
+router.post('/assignments/bulk-regenerate', bulkRegenerateAssignments);
+
 // Legacy aliases (point to new functions or placeholders)
 router.post('/assignments/:id/pause', pauseAssignment);
 router.post('/assignments/:id/resume', resumeAssignment);
@@ -118,6 +126,12 @@ router.post('/assignments/:id/reject', rejectAssignment);
 // BRIEFS
 // =============================================================================
 router.get('/briefs', briefs);
+
+// =============================================================================
+// EXPORT
+// =============================================================================
+router.get('/export/assignments', exportAssignments);
+router.get('/export/users', exportUsers);
 
 // =============================================================================
 // LOGS

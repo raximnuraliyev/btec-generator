@@ -110,8 +110,8 @@ export async function startGeneration(assignmentId: string, userId: string) {
       },
       // STUDENT CONTEXT - For first-person personalised writing
       studentContext: {
-        profileSnapshot: assignment.studentProfileSnapshot as any || null,
-        studentInputs: assignment.studentInputs as any || null,
+        profileSnapshot: (assignment as any).studentProfileSnapshot || null,
+        studentInputs: (assignment as any).studentInputs || null,
       },
     };
 

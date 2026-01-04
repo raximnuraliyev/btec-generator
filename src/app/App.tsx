@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AssignmentProvider } from './context/AssignmentContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { LoginPage } from './components/LoginPage';
 import { DashboardPage } from './components/DashboardPage';
 import { HowToUsePage } from './components/HowToUsePage';
@@ -19,6 +20,9 @@ import { BriefCreationPage } from './components/BriefCreationPage';
 import { AssignmentPreviewPage } from './components/AssignmentPreviewPage';
 import { TeacherDashboardPage } from './components/TeacherDashboardPage';
 import { StudentInputPage } from './components/StudentInputPage';
+import TermsOfUsePage from './components/TermsOfUsePage';
+import PrivacyPolicyPage from './components/PrivacyPolicyPage';
+import AcademicDisclaimerPage from './components/AcademicDisclaimerPage';
 import { Toaster } from 'sonner';
 
 /**
@@ -31,16 +35,18 @@ import { Toaster } from 'sonner';
  * Made by Ajax Manson
  */
 
-type Page = 'login' | 'dashboard' | 'how-to-use' | 'create' | 'profile' | 'monitor' | 'review' | 'admin' | 'issues' | 'support' | 'tokens' | 'briefs' | 'create-brief' | 'preview' | 'teacher' | 'student-inputs';
+type Page = 'login' | 'dashboard' | 'how-to-use' | 'create' | 'profile' | 'monitor' | 'review' | 'admin' | 'issues' | 'support' | 'tokens' | 'briefs' | 'create-brief' | 'preview' | 'teacher' | 'student-inputs' | 'terms' | 'privacy' | 'disclaimer';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AssignmentProvider>
-        <Toaster position="top-right" richColors />
-        <Router />
-      </AssignmentProvider>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <AssignmentProvider>
+          <Toaster position="top-right" richColors />
+          <Router />
+        </AssignmentProvider>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }
 
@@ -155,6 +161,15 @@ function Router() {
         return null;
       }
       return <StudentInputPage assignmentId={currentAssignmentId} onNavigate={navigate} />;
+
+    case 'terms':
+      return <TermsOfUsePage onBack={() => navigate('dashboard')} onNavigate={(page) => navigate(page)} />;
+
+    case 'privacy':
+      return <PrivacyPolicyPage onBack={() => navigate('dashboard')} onNavigate={(page) => navigate(page)} />;
+
+    case 'disclaimer':
+      return <AcademicDisclaimerPage onBack={() => navigate('dashboard')} onNavigate={(page) => navigate(page)} />;
 
     default:
       return <DashboardPage onNavigate={navigate} />;

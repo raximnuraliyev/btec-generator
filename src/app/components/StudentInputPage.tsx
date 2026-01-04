@@ -9,7 +9,7 @@ import type { Brief, StudentInputData, InputFieldDefinition } from '../types';
 
 interface StudentInputPageProps {
   assignmentId: string;
-  onNavigate: (page: string, id?: string) => void;
+  onNavigate: (page: 'monitor' | 'dashboard' | string, id?: string) => void;
 }
 
 interface AssignmentWithInputs {

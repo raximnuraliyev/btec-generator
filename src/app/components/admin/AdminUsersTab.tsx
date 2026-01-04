@@ -199,38 +199,38 @@ export function AdminUsersTab() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
           <Users className="w-5 h-5" />
           User Management
           <span className="text-sm font-normal text-gray-500">({totalCount} total)</span>
         </h2>
         <div className="flex gap-2">
-          <Button onClick={handleExportUsers} variant="outline" className="border-2 border-black">
-            <Download className="w-4 h-4 mr-2" />
-            Export
+          <Button onClick={handleExportUsers} variant="outline" className="border-2 border-black flex-1 sm:flex-none min-h-[44px]">
+            <Download className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export</span>
           </Button>
-          <Button onClick={loadUsers} variant="outline" className="border-2 border-black">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+          <Button onClick={loadUsers} variant="outline" className="border-2 border-black flex-1 sm:flex-none min-h-[44px]">
+            <RefreshCw className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-white border-2 border-black p-4">
-        <div className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-64 flex gap-2">
+      <div className="bg-white border-2 border-black p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <div className="flex-1 flex gap-2">
             <Input
               placeholder="Search by email or name..."
               value={filters.search}
               onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="border-2 border-black"
+              className="border-2 border-black min-h-[44px]"
             />
-            <Button onClick={handleSearch} className="bg-black text-white hover:bg-gray-800">
+            <Button onClick={handleSearch} className="bg-black text-white hover:bg-gray-800 min-h-[44px]">
               <Search className="w-4 h-4" />
             </Button>
           </div>
@@ -238,7 +238,7 @@ export function AdminUsersTab() {
           <Button 
             variant="outline" 
             onClick={() => setShowFilters(!showFilters)}
-            className={`border-2 ${showFilters ? 'border-black bg-gray-100' : 'border-gray-300'}`}
+            className={`border-2 min-h-[44px] ${showFilters ? 'border-black bg-gray-100' : 'border-gray-300'}`}
           >
             <SlidersHorizontal className="w-4 h-4 mr-2" />
             Filters
@@ -246,13 +246,13 @@ export function AdminUsersTab() {
         </div>
 
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Role</label>
               <select
                 value={filters.role}
                 onChange={(e) => setFilters(prev => ({ ...prev, role: e.target.value }))}
-                className="w-full p-2 border-2 border-black rounded"
+                className="w-full p-2 border-2 border-black rounded min-h-[44px]"
               >
                 <option value="">All Roles</option>
                 <option value="USER">User</option>
@@ -266,7 +266,7 @@ export function AdminUsersTab() {
               <select
                 value={filters.plan}
                 onChange={(e) => setFilters(prev => ({ ...prev, plan: e.target.value }))}
-                className="w-full p-2 border-2 border-black rounded"
+                className="w-full p-2 border-2 border-black rounded min-h-[44px]"
               >
                 <option value="">All Plans</option>
                 <option value="FREE">Free</option>
@@ -276,12 +276,12 @@ export function AdminUsersTab() {
                 <option value="PREMIUM">Premium</option>
               </select>
             </div>
-            <div>
+            <div className="sm:col-span-2 md:col-span-1">
               <label className="block text-sm font-medium mb-1">Status</label>
               <select
                 value={filters.status}
                 onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full p-2 border-2 border-black rounded"
+                className="w-full p-2 border-2 border-black rounded min-h-[44px]"
               >
                 <option value="">All Statuses</option>
                 <option value="ACTIVE">Active</option>
@@ -293,115 +293,202 @@ export function AdminUsersTab() {
         )}
       </div>
 
-      {/* Users Table */}
+      {/* Users - Card view on mobile, Table on desktop */}
       <div className="bg-white border-2 border-black overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b-2 border-black">
-                <tr>
-                  <th className="text-left p-4 font-bold">User</th>
-                  <th className="text-left p-4 font-bold">Role</th>
-                  <th className="text-left p-4 font-bold">Plan</th>
-                  <th className="text-center p-4 font-bold">Tokens</th>
-                  <th className="text-center p-4 font-bold">Assignments</th>
-                  <th className="text-left p-4 font-bold">Status</th>
-                  <th className="text-right p-4 font-bold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="p-4">
-                      <div>
-                        <p className="font-medium">{user.name || 'No name'}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <select
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-200 flex-1">
+              {users.map((user) => (
+                <div key={user.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{user.name || 'No name'}</p>
+                      <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                    </div>
+                    <StatusBadge status={user.status} />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-500">Role:</span>
+                      <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                        user.role === 'ADMIN' ? 'bg-yellow-100 text-yellow-800' :
+                        user.role === 'VIP' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'TEACHER' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100'
+                      }`}>
+                        {user.role}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Plan:</span>
+                      <span className="ml-2">{user.tokenPlan?.planType || 'FREE'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Coins className="w-4 h-4 text-yellow-500 mr-1" />
+                      <span className="font-mono font-bold">{user.tokenPlan?.tokensRemaining || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Assignments:</span>
+                      <span className="ml-2 font-mono">{user.totalAssignmentsGenerated || 0}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Mobile Actions */}
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                    <Button
+                      onClick={() => openTokenModal(user.id, 'add')}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 min-h-[40px] text-green-600 border-green-200"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Tokens
+                    </Button>
+                    <Button
+                      onClick={() => openTokenModal(user.id, 'deduct')}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 min-h-[40px] text-red-600 border-red-200"
+                    >
+                      <Minus className="w-4 h-4 mr-1" />
+                      Deduct
+                    </Button>
+                    {user.status === 'active' ? (
+                      <Button
+                        onClick={() => handleSuspendUser(user.id)}
+                        variant="outline"
+                        size="sm"
                         disabled={actionLoading === user.id}
-                        className={`text-sm px-2 py-1 rounded border ${
-                          user.role === 'ADMIN' ? 'border-yellow-500 bg-yellow-50' :
-                          user.role === 'VIP' ? 'border-purple-500 bg-purple-50' :
-                          user.role === 'TEACHER' ? 'border-blue-500 bg-blue-50' :
-                          'border-gray-300'
-                        }`}
+                        className="flex-1 min-h-[40px] text-orange-600 border-orange-200"
                       >
-                        <option value="USER">User</option>
-                        <option value="VIP">VIP</option>
-                        <option value="TEACHER">Teacher</option>
-                        <option value="ADMIN">Admin</option>
-                      </select>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-sm">{user.tokenPlan?.planType || 'FREE'}</span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Coins className="w-4 h-4 text-yellow-500" />
-                        <span className="font-mono font-bold">{user.tokenPlan?.tokensRemaining || 0}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="font-mono">{user.totalAssignmentsGenerated || 0}</span>
-                    </td>
-                    <td className="p-4">
-                      <StatusBadge status={user.status} />
-                    </td>
-                    <td className="p-4">
-                      <div className="flex justify-end gap-1">
-                        {/* Token Actions */}
-                        <button
-                          onClick={() => openTokenModal(user.id, 'add')}
-                          title="Add tokens"
-                          className="p-2 hover:bg-green-100 rounded text-green-600"
+                        <Ban className="w-4 h-4 mr-1" />
+                        Suspend
+                      </Button>
+                    ) : user.status === 'suspended' ? (
+                      <Button
+                        onClick={() => handleUnsuspendUser(user.id)}
+                        variant="outline"
+                        size="sm"
+                        disabled={actionLoading === user.id}
+                        className="flex-1 min-h-[40px] text-green-600 border-green-200"
+                      >
+                        Unsuspend
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 border-b-2 border-black">
+                  <tr>
+                    <th className="text-left p-4 font-bold whitespace-nowrap">User</th>
+                    <th className="text-left p-4 font-bold whitespace-nowrap">Role</th>
+                    <th className="text-left p-4 font-bold whitespace-nowrap">Plan</th>
+                    <th className="text-center p-4 font-bold whitespace-nowrap">Tokens</th>
+                    <th className="text-center p-4 font-bold whitespace-nowrap">Assignments</th>
+                    <th className="text-left p-4 font-bold whitespace-nowrap">Status</th>
+                    <th className="text-right p-4 font-bold whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {users.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="p-4">
+                        <div>
+                          <p className="font-medium">{user.name || 'No name'}</p>
+                          <p className="text-sm text-gray-500">{user.email}</p>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <select
+                          value={user.role}
+                          onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                          disabled={actionLoading === user.id}
+                          className={`text-sm px-2 py-1 rounded border min-h-[36px] ${
+                            user.role === 'ADMIN' ? 'border-yellow-500 bg-yellow-50' :
+                            user.role === 'VIP' ? 'border-purple-500 bg-purple-50' :
+                            user.role === 'TEACHER' ? 'border-blue-500 bg-blue-50' :
+                            'border-gray-300'
+                          }`}
                         >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => openTokenModal(user.id, 'deduct')}
-                          title="Deduct tokens"
-                          className="p-2 hover:bg-red-100 rounded text-red-600"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => openTokenModal(user.id, 'reset')}
-                          title="Reset tokens to plan default"
-                          className="p-2 hover:bg-gray-100 rounded text-gray-600"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                        </button>
-                        
-                        <div className="w-px bg-gray-200 mx-1" />
-                        
-                        {/* Status Actions */}
-                        {user.status === 'active' ? (
+                          <option value="USER">User</option>
+                          <option value="VIP">VIP</option>
+                          <option value="TEACHER">Teacher</option>
+                          <option value="ADMIN">Admin</option>
+                        </select>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-sm">{user.tokenPlan?.planType || 'FREE'}</span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Coins className="w-4 h-4 text-yellow-500" />
+                          <span className="font-mono font-bold">{user.tokenPlan?.tokensRemaining || 0}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="font-mono">{user.totalAssignmentsGenerated || 0}</span>
+                      </td>
+                      <td className="p-4">
+                        <StatusBadge status={user.status} />
+                      </td>
+                      <td className="p-4">
+                        <div className="flex justify-end gap-1">
+                          {/* Token Actions */}
                           <button
-                            onClick={() => handleSuspendUser(user.id)}
-                            title="Suspend user"
-                            disabled={actionLoading === user.id}
-                            className="p-2 hover:bg-orange-100 rounded text-orange-600"
+                            onClick={() => openTokenModal(user.id, 'add')}
+                            title="Add tokens"
+                            className="p-2 hover:bg-green-100 rounded text-green-600 min-h-[36px] min-w-[36px]"
                           >
-                            <Ban className="w-4 h-4" />
+                            <Plus className="w-4 h-4" />
                           </button>
-                        ) : user.status === 'suspended' ? (
                           <button
-                            onClick={() => handleUnsuspendUser(user.id)}
-                            title="Unsuspend user"
-                            disabled={actionLoading === user.id}
-                            className="p-2 hover:bg-green-100 rounded text-green-600"
+                            onClick={() => openTokenModal(user.id, 'deduct')}
+                            title="Deduct tokens"
+                            className="p-2 hover:bg-red-100 rounded text-red-600 min-h-[36px] min-w-[36px]"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => openTokenModal(user.id, 'reset')}
+                            title="Reset tokens to plan default"
+                            className="p-2 hover:bg-gray-100 rounded text-gray-600 min-h-[36px] min-w-[36px]"
                           >
                             <RotateCcw className="w-4 h-4" />
                           </button>
-                        ) : null}
+                          
+                          <div className="w-px bg-gray-200 mx-1" />
+                          
+                          {/* Status Actions */}
+                          {user.status === 'active' ? (
+                            <button
+                              onClick={() => handleSuspendUser(user.id)}
+                              title="Suspend user"
+                              disabled={actionLoading === user.id}
+                              className="p-2 hover:bg-orange-100 rounded text-orange-600 min-h-[36px] min-w-[36px]"
+                            >
+                              <Ban className="w-4 h-4" />
+                            </button>
+                          ) : user.status === 'suspended' ? (
+                            <button
+                              onClick={() => handleUnsuspendUser(user.id)}
+                              title="Unsuspend user"
+                              disabled={actionLoading === user.id}
+                              className="p-2 hover:bg-green-100 rounded text-green-600 min-h-[36px] min-w-[36px]"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+                          ) : null}
                         
                         {user.status !== 'banned' && user.role !== 'ADMIN' && (
                           <button
@@ -428,6 +515,7 @@ export function AdminUsersTab() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

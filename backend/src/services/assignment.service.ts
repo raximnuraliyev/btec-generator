@@ -71,7 +71,7 @@ export const createAssignment = async (
       assessmentCriteria: brief.assessmentCriteria as any,
       checklistOfEvidence: brief.checklistOfEvidence as any,
       sourcesOfInformation: brief.sourcesOfInformation as any,
-      requiredInputs: brief.requiredInputs as any,
+      requiredInputs: (brief as any).requiredInputs as any,
       language,
       includeImages,
       includeTables,
@@ -127,7 +127,7 @@ export const saveStudentInputs = async (
   }
 
   // Validate inputs against schema
-  const requiredInputs = assignment.snapshot.requiredInputs as InputFieldDefinition[] | null;
+  const requiredInputs = (assignment as any).snapshot?.requiredInputs as InputFieldDefinition[] | null;
   
   if (requiredInputs && requiredInputs.length > 0) {
     const validationErrors = validateStudentInputs(inputs, requiredInputs);

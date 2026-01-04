@@ -14,7 +14,10 @@ import {
   BriefStatus,
   TokenPlanType,
   IssueCategory,
-  IssueStatus
+  IssueStatus,
+  PaymentStatus,
+  PaymentMethod,
+  PaymentPlanType
 } from '@prisma/client';
 
 // Re-export Prisma enums
@@ -27,7 +30,10 @@ export {
   BriefStatus,
   TokenPlanType,
   IssueCategory,
-  IssueStatus
+  IssueStatus,
+  PaymentStatus,
+  PaymentMethod,
+  PaymentPlanType
 };
 
 // =============================================================================

@@ -7,8 +7,10 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { 
   ArrowLeft, AlertCircle, CheckCircle, Clock, Send,
-  Plus, ChevronDown, ChevronUp, MessageSquare
+  Plus, ChevronDown, ChevronUp, MessageSquare, ExternalLink
 } from 'lucide-react';
+
+const DISCORD_INVITE_LINK = 'https://discord.gg/wjPGhY6X';
 
 interface Issue {
   id: string;
@@ -121,31 +123,31 @@ export function SupportPage({ onBack }: SupportPageProps) {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b-2 border-black">
-        <div className="max-w-3xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={onBack}>
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back
+        <div className="max-w-3xl mx-auto px-4 py-3 md:py-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 md:gap-4">
+              <Button variant="ghost" onClick={onBack} className="min-h-[44px] min-w-[44px] p-2 md:px-4">
+                <ArrowLeft className="w-5 h-5 md:mr-2" />
+                <span className="hidden md:inline">Back</span>
               </Button>
-              <h1 className="text-xl font-bold">Support & Issues</h1>
+              <h1 className="text-lg md:text-xl font-bold">Support & Issues</h1>
             </div>
             <Button 
               onClick={() => setShowNewForm(!showNewForm)}
-              className="bg-black text-white hover:bg-gray-800"
+              className="bg-black text-white hover:bg-gray-800 min-h-[44px]"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              New Issue
+              <Plus className="w-4 h-4 md:mr-2" />
+              <span className="hidden sm:inline">New Issue</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-4 md:py-8">
         {/* New Issue Form */}
         {showNewForm && (
-          <div className="bg-white border-2 border-black p-6 mb-6">
-            <h2 className="font-bold text-lg mb-4">Report an Issue</h2>
+          <div className="bg-white border-2 border-black p-4 md:p-6 mb-4 md:mb-6">
+            <h2 className="font-bold text-base md:text-lg mb-4">Report an Issue</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="title">Title *</Label>
@@ -154,19 +156,19 @@ export function SupportPage({ onBack }: SupportPageProps) {
                   value={newIssue.title}
                   onChange={(e) => setNewIssue(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="Brief description of the issue"
-                  className="border-2 border-black mt-1"
+                  className="border-2 border-black mt-1 min-h-[44px]"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="category">Category</Label>
                   <select
                     id="category"
                     value={newIssue.category}
                     onChange={(e) => setNewIssue(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full p-2 border-2 border-black rounded mt-1"
+                    className="w-full p-2 min-h-[44px] border-2 border-black rounded mt-1 text-base"
                   >
                     {CATEGORIES.map(cat => (
                       <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -179,7 +181,7 @@ export function SupportPage({ onBack }: SupportPageProps) {
                     id="priority"
                     value={newIssue.priority}
                     onChange={(e) => setNewIssue(prev => ({ ...prev, priority: e.target.value }))}
-                    className="w-full p-2 border-2 border-black rounded mt-1"
+                    className="w-full p-2 min-h-[44px] border-2 border-black rounded mt-1 text-base"
                   >
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
@@ -195,24 +197,24 @@ export function SupportPage({ onBack }: SupportPageProps) {
                   value={newIssue.description}
                   onChange={(e) => setNewIssue(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Please provide as much detail as possible..."
-                  className="border-2 border-black mt-1 min-h-32"
+                  className="border-2 border-black mt-1 min-h-32 text-base"
                   required
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowNewForm(false)}
-                  className="border-2 border-black"
+                  className="border-2 border-black min-h-[44px] order-2 sm:order-1"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={submitting || !newIssue.title.trim() || !newIssue.description.trim()}
-                  className="bg-black text-white hover:bg-gray-800"
+                  className="bg-black text-white hover:bg-gray-800 min-h-[44px] order-1 sm:order-2"
                 >
                   <Send className="w-4 h-4 mr-2" />
                   {submitting ? 'Submitting...' : 'Submit Issue'}
@@ -228,24 +230,24 @@ export function SupportPage({ onBack }: SupportPageProps) {
             <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
           </div>
         ) : issues.length === 0 ? (
-          <div className="bg-white border-2 border-black p-8 text-center">
+          <div className="bg-white border-2 border-black p-6 md:p-8 text-center">
             <AlertCircle className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-            <h3 className="font-bold text-lg mb-2">No Issues</h3>
-            <p className="text-gray-500 mb-4">You haven't reported any issues yet.</p>
+            <h3 className="font-bold text-base md:text-lg mb-2">No Issues</h3>
+            <p className="text-gray-500 mb-4 text-sm md:text-base">You haven't reported any issues yet.</p>
             <Button 
               onClick={() => setShowNewForm(true)}
-              className="bg-black text-white hover:bg-gray-800"
+              className="bg-black text-white hover:bg-gray-800 min-h-[44px]"
             >
               <Plus className="w-4 h-4 mr-2" />
               Report an Issue
             </Button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {/* Open Issues */}
             {openIssues.length > 0 && (
               <div>
-                <h2 className="font-bold text-lg mb-3 flex items-center gap-2">
+                <h2 className="font-bold text-base md:text-lg mb-3 flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-orange-500" />
                   Open Issues ({openIssues.length})
                 </h2>
@@ -268,7 +270,7 @@ export function SupportPage({ onBack }: SupportPageProps) {
             {/* Resolved Issues */}
             {resolvedIssues.length > 0 && (
               <div>
-                <h2 className="font-bold text-lg mb-3 flex items-center gap-2">
+                <h2 className="font-bold text-base md:text-lg mb-3 flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500" />
                   Resolved ({resolvedIssues.length})
                 </h2>
@@ -291,18 +293,21 @@ export function SupportPage({ onBack }: SupportPageProps) {
         )}
 
         {/* Help Section */}
-        <div className="mt-8 bg-gray-100 border-2 border-gray-300 p-6 rounded">
-          <h3 className="font-bold mb-2">Need Help?</h3>
-          <p className="text-gray-600 text-sm mb-4">
+        <div className="mt-6 md:mt-8 bg-gray-100 border-2 border-gray-300 p-4 md:p-6 rounded">
+          <h3 className="font-bold mb-2 text-sm md:text-base">Need Help?</h3>
+          <p className="text-gray-600 text-xs md:text-sm mb-4">
             Before submitting an issue, check if your question is answered in our FAQ or documentation.
           </p>
-          <div className="flex gap-3">
-            <Button variant="outline" className="border-2 border-black text-sm">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <Button variant="outline" className="border-2 border-black text-sm min-h-[44px]">
               View FAQ
             </Button>
-            <Button variant="outline" className="border-2 border-black text-sm">
-              Discord Community
-            </Button>
+            <a href={DISCORD_INVITE_LINK} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" className="border-2 border-black text-sm flex items-center gap-2 min-h-[44px] w-full sm:w-auto">
+                <ExternalLink className="w-4 h-4" />
+                Discord Community
+              </Button>
+            </a>
           </div>
         </div>
       </div>
@@ -331,23 +336,23 @@ function IssueCard({
     } overflow-hidden`}>
       {/* Header */}
       <div 
-        className="p-4 cursor-pointer hover:bg-gray-50"
+        className="p-3 md:p-4 cursor-pointer hover:bg-gray-50 min-h-[44px]"
         onClick={onToggle}
       >
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3">
-            {getStatusIcon(issue.status)}
-            <div>
-              <h3 className="font-bold">{issue.title}</h3>
-              <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2 md:gap-3 min-w-0 flex-1">
+            <div className="mt-1 flex-shrink-0">{getStatusIcon(issue.status)}</div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold text-sm md:text-base truncate">{issue.title}</h3>
+              <div className="flex flex-wrap items-center gap-1 md:gap-3 mt-1 text-xs md:text-sm text-gray-500">
                 <span>{CATEGORIES.find(c => c.value === issue.category)?.label || issue.category}</span>
-                <span>•</span>
-                <span>{new Date(issue.createdAt).toLocaleDateString()}</span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline">{new Date(issue.createdAt).toLocaleDateString()}</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {getPriorityBadge(issue.priority)}
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+            <div className="hidden sm:block">{getPriorityBadge(issue.priority)}</div>
             <span className={`px-2 py-1 text-xs rounded ${
               issue.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
               issue.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
@@ -355,7 +360,9 @@ function IssueCard({
             }`}>
               {getStatusLabel(issue.status)}
             </span>
-            {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            <div className="min-w-[44px] min-h-[44px] flex items-center justify-center -mr-2">
+              {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            </div>
           </div>
         </div>
       </div>
@@ -363,14 +370,15 @@ function IssueCard({
       {/* Expanded Content */}
       {expanded && (
         <div className="border-t-2 border-gray-200">
-          <div className="p-4 bg-gray-50">
-            <h4 className="text-sm font-medium text-gray-500 mb-2">Your Message</h4>
-            <p className="whitespace-pre-wrap text-gray-700">{issue.description}</p>
+          <div className="p-3 md:p-4 bg-gray-50">
+            <div className="sm:hidden mb-2">{getPriorityBadge(issue.priority)}</div>
+            <h4 className="text-xs md:text-sm font-medium text-gray-500 mb-2">Your Message</h4>
+            <p className="whitespace-pre-wrap text-gray-700 text-sm md:text-base">{issue.description}</p>
           </div>
 
           {issue.adminResponse && (
-            <div className="p-4 bg-blue-50 border-t border-blue-200">
-              <h4 className="text-sm font-medium text-blue-800 mb-2 flex items-center gap-2">
+            <div className="p-3 md:p-4 bg-blue-50 border-t border-blue-200">
+              <h4 className="text-xs md:text-sm font-medium text-blue-800 mb-2 flex flex-wrap items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
                 Admin Response
                 {issue.respondedAt && (
@@ -379,15 +387,15 @@ function IssueCard({
                   </span>
                 )}
               </h4>
-              <p className="text-blue-900 whitespace-pre-wrap">{issue.adminResponse}</p>
+              <p className="text-blue-900 whitespace-pre-wrap text-sm md:text-base">{issue.adminResponse}</p>
             </div>
           )}
 
           {issue.status === 'OPEN' && !issue.adminResponse && (
-            <div className="p-4 bg-yellow-50 border-t border-yellow-200">
-              <p className="text-yellow-700 text-sm flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Awaiting admin response. You will be notified when there's an update.
+            <div className="p-3 md:p-4 bg-yellow-50 border-t border-yellow-200">
+              <p className="text-yellow-700 text-xs md:text-sm flex items-center gap-2">
+                <Clock className="w-4 h-4 flex-shrink-0" />
+                <span>Awaiting admin response. You will be notified when there's an update.</span>
               </p>
             </div>
           )}
