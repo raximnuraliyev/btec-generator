@@ -1,6 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+// =============================================================================
+// BTEC GENERATOR - STUDENT SERVICE
+// =============================================================================
 
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export const createStudentProfile = async (
   userId: string,
@@ -10,20 +12,19 @@ export const createStudentProfile = async (
   groupName: string,
   city: string,
   academicYear?: string
-): Promise<{ confirmed: boolean; message: string }> => {
-  const existingProfile = await prisma.studentProfile.findUnique({
+): Promise<{ confirmed: boolean; message: string; profile: any }> => {
+  // Use upsert to handle both create and update
+  const profile = await prisma.studentProfile.upsert({
     where: { userId },
-  });
-
-  if (existingProfile) {
-    return {
-      confirmed: true,
-      message: 'Student profile already exists',
-    };
-  }
-
-  await prisma.studentProfile.create({
-    data: {
+    update: {
+      fullName,
+      universityName,
+      faculty,
+      groupName,
+      city,
+      academicYear,
+    },
+    create: {
       userId,
       fullName,
       universityName,
@@ -36,7 +37,8 @@ export const createStudentProfile = async (
 
   return {
     confirmed: true,
-    message: 'Student profile created successfully',
+    message: 'Student profile saved successfully',
+    profile,
   };
 };
 
@@ -71,5 +73,27 @@ export const getStudentProfile = async (
       city: profile.city,
       academicYear: profile.academicYear,
     },
+  };
+};
+
+export const updateStudentProfile = async (
+  userId: string,
+  data: {
+    fullName?: string;
+    universityName?: string;
+    faculty?: string;
+    groupName?: string;
+    city?: string;
+    academicYear?: string;
+  }
+): Promise<{ confirmed: boolean; message: string }> => {
+  await prisma.studentProfile.update({
+    where: { userId },
+    data,
+  });
+
+  return {
+    confirmed: true,
+    message: 'Student profile updated successfully',
   };
 };

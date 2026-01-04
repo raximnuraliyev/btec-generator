@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { authMiddleware } from '../middlewares/auth';
+import { Router, Response } from 'express';
+import { authMiddleware, AuthRequest } from '../middlewares/auth';
 import {
   getTokenBalance,
   getTokenHistory,
@@ -10,7 +10,7 @@ import {
 const router = Router();
 
 // Get token balance
-router.get('/balance', authMiddleware, async (req, res) => {
+router.get('/balance', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const balance = await getTokenBalance(req.user!.userId);
     res.json(balance);
@@ -20,7 +20,7 @@ router.get('/balance', authMiddleware, async (req, res) => {
 });
 
 // Get token transaction history
-router.get('/history', authMiddleware, async (req, res) => {
+router.get('/history', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
     const history = await getTokenHistory(req.user!.userId, limit);
@@ -31,7 +31,7 @@ router.get('/history', authMiddleware, async (req, res) => {
 });
 
 // Get available plans
-router.get('/plans', (req, res) => {
+router.get('/plans', (_req, res: Response) => {
   const plans = Object.entries(TOKEN_PLANS).map(([type, config]) => ({
     type,
     ...config,
@@ -41,12 +41,13 @@ router.get('/plans', (req, res) => {
 });
 
 // Upgrade plan
-router.post('/upgrade', authMiddleware, async (req, res) => {
+router.post('/upgrade', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { planType } = req.body;
 
     if (!TOKEN_PLANS[planType as keyof typeof TOKEN_PLANS]) {
-      return res.status(400).json({ message: 'Invalid plan type' });
+      res.status(400).json({ message: 'Invalid plan type' });
+      return;
     }
 
     const plan = await upgradePlan(req.user!.userId, planType);

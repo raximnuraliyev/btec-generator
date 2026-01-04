@@ -1,33 +1,49 @@
+// =============================================================================
+// BTEC GENERATOR - ADMIN CONTROLLER
+// =============================================================================
+// All admin endpoints for the new architecture.
+// =============================================================================
+
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth';
-import { UserRole, Prisma } from '@prisma/client';
+import { UserRole, UserStatus, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import {
-  getDashboardStats,
-  getAllUsers,
-  getUserDetails,
-  updateUserRole,
-  resetUserTokens,
-  getAIUsageAnalytics,
-  getUserFlags,
-  resolveUserFlag,
-  getAllBriefs,
-  downloadAnyAssignment,
-} from '../services/admin.service';
+import * as adminService from '../services/admin.service';
 import { APIError } from '../types';
 
+// =============================================================================
+// DASHBOARD
+// =============================================================================
+
 export const dashboard = async (
-  req: AuthRequest,
+  _req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const stats = await getDashboardStats();
+    const stats = await adminService.getDashboardStats();
     res.status(200).json(stats);
   } catch (error) {
     next(error);
   }
 };
+
+export const getOverviewStats = async (
+  _req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const stats = await adminService.getOverviewStats();
+    res.status(200).json(stats);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =============================================================================
+// USER MANAGEMENT
+// =============================================================================
 
 export const listUsers = async (
   req: AuthRequest,
@@ -37,7 +53,11 @@ export const listUsers = async (
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
-    const result = await getAllUsers(page, limit);
+    const search = req.query.search as string;
+    const role = req.query.role as UserRole;
+    const status = req.query.status as UserStatus;
+
+    const result = await adminService.getAllUsers(page, limit, { search, role, status });
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -51,17 +71,44 @@ export const userDetails = async (
 ): Promise<void> => {
   try {
     const { userId } = req.params;
-    const user = await getUserDetails(userId);
-    // Wrap in { user: ... } to match frontend expectation
+    const user = await adminService.getUserDetails(userId);
     res.status(200).json({ user });
   } catch (error) {
     if (error instanceof Error && error.message === 'User not found') {
-      res.status(404).json({
-        error: 'Not Found',
-        message: error.message,
-      } as APIError);
+      res.status(404).json({ error: 'Not Found', message: error.message } as APIError);
       return;
     }
+    next(error);
+  }
+};
+
+export const updateUser = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { name, email } = req.body;
+    
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        ...(name !== undefined && { name }),
+        ...(email !== undefined && { email }),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+    
+    res.status(200).json({ user });
+  } catch (error) {
     next(error);
   }
 };
@@ -76,15 +123,154 @@ export const changeRole = async (
     const { role } = req.body;
 
     if (!Object.values(UserRole).includes(role)) {
-      res.status(400).json({
-        error: 'Validation Error',
-        message: 'Invalid role',
-      } as APIError);
+      res.status(400).json({ error: 'Validation Error', message: 'Invalid role' } as APIError);
       return;
     }
 
-    const user = await updateUserRole(userId, role);
-    res.status(200).json(user);
+    // Create audit log
+    const oldUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const user = await adminService.updateUserRole(userId, role);
+    
+    if (req.user?.userId) {
+      await adminService.createAuditLog({
+        adminUserId: req.user.userId,
+        action: 'USER_ROLE_CHANGE',
+        targetType: 'USER',
+        targetId: userId,
+        previousValue: { role: oldUser?.role },
+        newValue: { role },
+      });
+    }
+
+    res.status(200).json({ user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const suspendUser = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { reason } = req.body;
+
+    await adminService.suspendUser(userId);
+    
+    if (req.user?.userId) {
+      await adminService.createAuditLog({
+        adminUserId: req.user.userId,
+        action: 'USER_SUSPENDED',
+        targetType: 'USER',
+        targetId: userId,
+        newValue: { reason },
+      });
+    }
+
+    res.status(200).json({ success: true, message: 'User suspended' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const unsuspendUser = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    await adminService.unsuspendUser(userId);
+    res.status(200).json({ success: true, message: 'User unsuspended' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const banUser = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { reason } = req.body;
+
+    await adminService.banUser(userId);
+    
+    if (req.user?.userId) {
+      await adminService.createAuditLog({
+        adminUserId: req.user.userId,
+        action: 'USER_BANNED',
+        targetType: 'USER',
+        targetId: userId,
+        newValue: { reason },
+      });
+    }
+
+    res.status(200).json({ success: true, message: 'User banned' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const unbanUser = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    await adminService.unbanUser(userId);
+    res.status(200).json({ success: true, message: 'User unbanned' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =============================================================================
+// TOKEN MANAGEMENT
+// =============================================================================
+
+export const addTokens = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { amount, reason } = req.body;
+
+    if (typeof amount !== 'number' || amount <= 0) {
+      res.status(400).json({ error: 'Validation Error', message: 'Amount must be a positive number' } as APIError);
+      return;
+    }
+
+    const result = await adminService.addUserTokens(userId, amount, reason || 'Admin adjustment');
+    res.status(200).json({ success: true, newBalance: result.newBalance });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deductTokens = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { amount, reason } = req.body;
+
+    if (typeof amount !== 'number' || amount <= 0) {
+      res.status(400).json({ error: 'Validation Error', message: 'Amount must be a positive number' } as APIError);
+      return;
+    }
+
+    const result = await adminService.deductUserTokens(userId, amount, reason || 'Admin adjustment');
+    res.status(200).json({ success: true, newBalance: result.newBalance });
   } catch (error) {
     next(error);
   }
@@ -97,139 +283,18 @@ export const resetTokens = async (
 ): Promise<void> => {
   try {
     const { userId } = req.params;
-    const { tokens } = req.body;
+    const { reason } = req.body;
 
-    if (typeof tokens !== 'number' || tokens < 0) {
-      res.status(400).json({
-        error: 'Validation Error',
-        message: 'Tokens must be a positive number',
-      } as APIError);
-      return;
-    }
-
-    const user = await resetUserTokens(userId, tokens);
-    res.status(200).json(user);
+    const result = await adminService.resetUserTokens(userId, reason);
+    res.status(200).json({ success: true, newBalance: result.newBalance });
   } catch (error) {
     next(error);
   }
 };
 
-export const aiAnalytics = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const days = parseInt(req.query.days as string) || 7;
-    const analytics = await getAIUsageAnalytics(days);
-    res.status(200).json(analytics);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const flags = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const resolved = req.query.resolved === 'true';
-    const flags = await getUserFlags(resolved);
-    res.status(200).json(flags);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const resolveFlag = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { flagId } = req.params;
-    const flag = await resolveUserFlag(flagId);
-    res.status(200).json(flag);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const briefs = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const briefs = await getAllBriefs();
-    res.status(200).json(briefs);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const downloadAssignment = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { assignmentId } = req.params;
-    const assignment = await downloadAnyAssignment(assignmentId);
-    res.status(200).json(assignment);
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Assignment not found') {
-      res.status(404).json({
-        error: 'Not Found',
-        message: error.message,
-      } as APIError);
-      return;
-    }
-    next(error);
-  }
-};
-
-// New endpoints for admin functionality
-export const updateUser = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { userId } = req.params;
-    const { role, email, trialTokens, plan } = req.body;
-    
-    // Build update data
-    const updateData: any = {};
-    if (role !== undefined) updateData.role = role;
-    if (email !== undefined) updateData.email = email;
-    if (trialTokens !== undefined) updateData.trialTokens = parseInt(trialTokens);
-    if (plan !== undefined) updateData.plan = plan;
-    
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        trialTokens: true,
-        plan: true,
-        createdAt: true,
-        studentProfile: {
-          select: {
-            fullName: true
-          }
-        }
-      }
-    });
-    
-    res.status(200).json(user);
-  } catch (error) {
-    next(error);
-  }
-};
+// =============================================================================
+// ASSIGNMENT MANAGEMENT
+// =============================================================================
 
 export const getAllAssignments = async (
   req: AuthRequest,
@@ -239,154 +304,76 @@ export const getAllAssignments = async (
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
-    const skip = (page - 1) * limit;
+    const status = req.query.status as any;
+    const grade = req.query.grade as string;
+    const level = req.query.level ? parseInt(req.query.level as string) : undefined;
+    const dateFrom = req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined;
+    const dateTo = req.query.dateTo ? new Date(req.query.dateTo as string) : undefined;
+
+    const result = await adminService.getAllAssignments(page, limit, { status, grade, level, dateFrom, dateTo });
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const forceCompleteAssignment = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await adminService.forceCompleteAssignment(id);
+    res.status(200).json({ success: true, message: 'Assignment marked as completed' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const cancelAssignment = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await adminService.cancelAssignment(id);
+    res.status(200).json({ success: true, message: 'Assignment cancelled' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const regenerateAssignment = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
     
-    const [assignments, total] = await Promise.all([
-      prisma.assignment.findMany({
-        take: limit,
-        skip: skip,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              studentProfile: {
-                select: {
-                  fullName: true
-                }
-              }
-            }
-          },
-          snapshot: {
-            select: {
-              id: true,
-              unitName: true,
-              subjectName: true,
-              unitCode: true,
-              level: true
-            }
-          }
-        }
+    // Clear old content and reset status
+    await prisma.$transaction([
+      prisma.contentBlock.deleteMany({ where: { assignmentId: id } }),
+      prisma.generationPlan.deleteMany({ where: { assignmentId: id } }),
+      prisma.assignment.update({
+        where: { id },
+        data: {
+          status: 'DRAFT',
+          error: null,
+          content: Prisma.JsonNull,
+          guidance: Prisma.JsonNull,
+          totalTokensUsed: 0,
+          totalAiCalls: 0,
+          generationDurationMs: null,
+          completedAt: null,
+          docxUrl: null,
+        },
       }),
-      prisma.assignment.count()
     ]);
-    
-    res.status(200).json({ 
-      assignments, 
-      total, 
-      page, 
-      pages: Math.ceil(total / limit) 
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
-export const pauseAssignment = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    
-    const assignment = await prisma.assignment.update({
-      where: { id },
-      data: { status: 'DRAFT' } // Use valid status, no 'paused' status
-    });
-    
-    res.status(200).json({ 
-      message: 'Assignment paused', 
-      status: assignment.status 
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const resumeAssignment = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    
-    const assignment = await prisma.assignment.update({
-      where: { id },
-      data: { status: 'GENERATING' }
-    });
-    
-    res.status(200).json({ 
-      message: 'Assignment resumed', 
-      status: assignment.status 
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const stopAssignment = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    
-    const assignment = await prisma.assignment.update({
-      where: { id },
-      data: { status: 'FAILED' } // Use FAILED instead of 'stopped'
-    });
-    
-    res.status(200).json({ 
-      message: 'Assignment stopped', 
-      status: assignment.status 
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const restartAssignment = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    
-    // First, clear old content blocks and generation plan
-    await prisma.contentBlock.deleteMany({
-      where: { assignmentId: id }
-    });
-    
-    await prisma.generationPlan.deleteMany({
-      where: { assignmentId: id }
-    });
-    
-    // Update assignment status back to DRAFT so it can be regenerated
-    const assignment = await prisma.assignment.update({
-      where: { id },
-      data: { 
-        status: 'DRAFT',
-        error: null,
-        content: Prisma.JsonNull,
-        guidance: Prisma.JsonNull,
-        totalTokensUsed: 0,
-        totalAiCalls: 0,
-        generationDurationMs: null,
-        completedAt: null,
-        docxUrl: null,
-      }
-    });
-    
-    res.status(200).json({ 
-      message: 'Assignment reset and ready for regeneration', 
-      jobId: assignment.id, 
-      status: assignment.status 
-    });
+    res.status(200).json({ success: true, message: 'Assignment reset for regeneration' });
   } catch (error) {
     next(error);
   }
@@ -399,17 +386,97 @@ export const deleteAssignment = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    
-    // Delete the assignment (cascade will handle related records)
-    await prisma.assignment.delete({
-      where: { id }
-    });
-    
+    await adminService.deleteAssignment(id);
     res.status(200).json({ message: 'Assignment deleted successfully' });
   } catch (error) {
     next(error);
   }
 };
+
+export const downloadAssignment = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { assignmentId } = req.params;
+    const assignment = await adminService.downloadAnyAssignment(assignmentId);
+    res.status(200).json(assignment);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Assignment not found') {
+      res.status(404).json({ error: 'Not Found', message: error.message } as APIError);
+      return;
+    }
+    next(error);
+  }
+};
+
+// =============================================================================
+// BRIEFS
+// =============================================================================
+
+export const briefs = async (
+  _req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const briefs = await adminService.getAllBriefs();
+    res.status(200).json(briefs);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =============================================================================
+// ANALYTICS
+// =============================================================================
+
+export const aiAnalytics = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const days = parseInt(req.query.days as string) || 7;
+    const analytics = await adminService.getAIUsageAnalytics(days);
+    res.status(200).json(analytics);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTokenAnalytics = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const period = (req.query.period as '24h' | '7d' | '30d' | '90d' | '1y') || '7d';
+    const analytics = await adminService.getTokenAnalytics(period);
+    res.status(200).json(analytics);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getRecap = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const type = (req.query.type as 'weekly' | 'monthly' | 'yearly') || 'weekly';
+    const recap = await adminService.getRecap(type);
+    res.status(200).json(recap);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =============================================================================
+// LOGS
+// =============================================================================
 
 export const getLogs = async (
   req: AuthRequest,
@@ -418,86 +485,37 @@ export const getLogs = async (
 ): Promise<void> => {
   try {
     const { type } = req.params;
-    const lines = parseInt(req.query.lines as string) || 100;
-    
-    // Get AI usage logs from database
-    if (type === 'ai' || type === 'backend') {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 100;
+    const level = req.query.level as string;
+    const category = req.query.category as string;
+    const dateFrom = req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined;
+    const dateTo = req.query.dateTo ? new Date(req.query.dateTo as string) : undefined;
+
+    // Default to system logs if no type specified
+    if (!type || type === 'system') {
+      const result = await adminService.getSystemLogs(page, limit, { level, category, dateFrom, dateTo });
+      res.status(200).json(result);
+    } else if (type === 'audit') {
+      const action = req.query.action as string;
+      const result = await adminService.getAuditLogs(page, limit, { action, dateFrom, dateTo });
+      res.status(200).json(result);
+    } else {
+      // AI logs
       const logs = await prisma.aIUsageLog.findMany({
-        take: lines,
+        take: limit,
+        skip: (page - 1) * limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          assignment: {
-            select: {
-              id: true,
-              snapshot: {
-                select: {
-                  unitName: true
-                }
-              }
-            }
-          }
-        }
+          assignment: { select: { id: true, snapshot: { select: { unitName: true } } } },
+        },
       });
-      
-      // Format as string for frontend display in <pre> tag
-      const logLines = logs.map(log => {
-        const timestamp = log.createdAt.toISOString();
-        const unitName = log.assignment?.snapshot?.unitName || 'Unknown';
-        return `[${timestamp}] [${log.purpose}] Model: ${log.aiModel}, Tokens: ${log.totalTokens}, Unit: ${unitName}`;
+      const total = await prisma.aIUsageLog.count();
+      res.status(200).json({
+        logs,
+        pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
       });
-      
-      res.status(200).json({ 
-        type, 
-        lines: logLines.length, 
-        content: logLines.join('\n'),
-        timestamp: new Date().toISOString() 
-      });
-      return;
     }
-    
-    // Get error logs from failed assignments
-    if (type === 'error') {
-      const failedAssignments = await prisma.assignment.findMany({
-        where: { status: 'FAILED' },
-        take: lines,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          error: true,
-          createdAt: true,
-          user: {
-            select: { email: true }
-          },
-          snapshot: {
-            select: { unitName: true }
-          }
-        }
-      });
-      
-      // Format as string for frontend display
-      const errorLines = failedAssignments.map(a => {
-        const timestamp = a.createdAt.toISOString();
-        const email = a.user?.email || 'Unknown';
-        const unitName = a.snapshot?.unitName || 'Unknown';
-        return `[${timestamp}] [ERROR] User: ${email}, Unit: ${unitName}\n  Error: ${a.error || 'Unknown error'}`;
-      });
-      
-      res.status(200).json({ 
-        type, 
-        lines: errorLines.length, 
-        content: errorLines.join('\n\n'),
-        timestamp: new Date().toISOString() 
-      });
-      return;
-    }
-    
-    // Default response for other log types (placeholder - no data)
-    res.status(200).json({ 
-      type, 
-      lines: 0, 
-      content: `No ${type} logs available. This feature is not yet implemented.`, 
-      timestamp: new Date().toISOString() 
-    });
   } catch (error) {
     next(error);
   }
@@ -511,260 +529,193 @@ export const getAuditLogs = async (
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 100;
-    res.status(200).json({ logs: [], total: 0, page, pages: 0 });
+    const action = req.query.action as string;
+    const dateFrom = req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined;
+    const dateTo = req.query.dateTo ? new Date(req.query.dateTo as string) : undefined;
+
+    const result = await adminService.getAuditLogs(page, limit, { action, dateFrom, dateTo });
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }
 };
 
-export const getOverviewStats = async (
+// =============================================================================
+// ISSUES (Admin view)
+// =============================================================================
+
+export const getAllIssues = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Get all users for counting by role
-    const allUsers = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        studentProfile: {
-          select: {
-            fullName: true
-          }
-        }
+    const status = req.query.status as string;
+    const category = req.query.category as string;
+    const priority = req.query.priority as string;
+
+    const where: any = {};
+    if (status) where.status = status;
+    if (category) where.category = category;
+    if (priority) where.priority = priority;
+
+    const issues = await prisma.issue.findMany({
+      where,
+      include: {
+        user: { select: { id: true, email: true, name: true } },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
-    // Count users by role
-    const usersByRole = allUsers.reduce((acc, user) => {
-      acc[user.role] = (acc[user.role] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    res.status(200).json({ issues });
+  } catch (error) {
+    next(error);
+  }
+};
 
-    // Ensure all roles are represented
-    const roleStats = {
-      ADMIN: usersByRole.ADMIN || 0,
-      TEACHER: usersByRole.TEACHER || 0,
-      USER: usersByRole.USER || 0,
-      VIP: usersByRole.VIP || 0
-    };
+export const respondToIssue = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { issueId } = req.params;
+    const { response } = req.body;
 
-    // Get assignment stats
-    const allAssignments = await prisma.assignment.findMany({
-      select: {
-        id: true,
-        status: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            email: true
-          }
+    await prisma.issue.update({
+      where: { id: issueId },
+      data: {
+        adminResponse: response,
+        status: 'IN_PROGRESS',
+      },
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resolveIssue = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { issueId } = req.params;
+
+    await prisma.issue.update({
+      where: { id: issueId },
+      data: { status: 'RESOLVED' },
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reopenIssue = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { issueId } = req.params;
+
+    await prisma.issue.update({
+      where: { id: issueId },
+      data: { status: 'OPEN' },
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =============================================================================
+// SYSTEM CONTROLS
+// =============================================================================
+
+export const pauseAllGeneration = async (
+  _req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    res.status(200).json({ success: true, message: 'Generation paused (placeholder)' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resumeAllGeneration = async (
+  _req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    res.status(200).json({ success: true, message: 'Generation resumed (placeholder)' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSystemStatus = async (
+  _req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const [activeJobs, failedLast24h] = await Promise.all([
+      prisma.assignment.count({ where: { status: 'GENERATING' } }),
+      prisma.assignment.count({
+        where: {
+          status: 'FAILED',
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
-        snapshot: {
-          select: {
-            unitName: true,
-            subjectName: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+      }),
+    ]);
 
-    const assignmentsByStatus = allAssignments.reduce((acc, assignment) => {
-      acc[assignment.status] = (acc[assignment.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    res.status(200).json({
-      totals: {
-        users: allUsers.length,
-        assignments: allAssignments.length,
-        activeGenerations: allAssignments.filter(a => a.status === 'GENERATING').length
-      },
-      usersByRole: roleStats,
-      assignmentsByStatus: {
-        DRAFT: assignmentsByStatus.DRAFT || 0,
-        GENERATING: assignmentsByStatus.GENERATING || 0,
-        COMPLETED: assignmentsByStatus.COMPLETED || 0,
-        FAILED: assignmentsByStatus.FAILED || 0
-      },
-      recentUsers: allUsers.slice(0, 5).map(user => ({
-        id: user.id,
-        email: user.email,
-        name: user.studentProfile?.fullName || null,
-        role: user.role,
-        createdAt: user.createdAt.toISOString()
-      })),
-      recentAssignments: allAssignments.slice(0, 5)
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getTokenAnalytics = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const period = req.query.period as string || '7d';
-    
-    // Calculate date range
-    let days = 7;
-    if (period === '24h') days = 1;
-    else if (period === '30d') days = 30;
-    else if (period === '90d') days = 90;
-    else if (period === '1y') days = 365;
-    
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    
-    // Get total tokens
-    const tokenSummary = await prisma.aIUsageLog.aggregate({
-      where: { createdAt: { gte: startDate } },
-      _sum: {
-        totalTokens: true,
-        promptTokens: true,
-        completionTokens: true
-      },
-      _count: true
-    });
-    
-    // Get tokens by user
-    const tokensByUser = await prisma.aIUsageLog.groupBy({
-      by: ['userId'],
-      where: { createdAt: { gte: startDate } },
-      _sum: { totalTokens: true },
-      orderBy: { _sum: { totalTokens: 'desc' } },
-      take: 20
-    });
-    
-    // Get user details for the top users
-    const userIds = tokensByUser.map(t => t.userId);
-    const users = await prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: {
-        id: true,
-        email: true,
-        studentProfile: { select: { fullName: true } }
-      }
-    });
-    
-    const userMap = new Map(users.map(u => [u.id, u]));
-    
-    const byUser = tokensByUser.map(t => ({
-      userId: t.userId,
-      email: userMap.get(t.userId)?.email || 'Unknown',
-      name: userMap.get(t.userId)?.studentProfile?.fullName || null,
-      tokens: t._sum.totalTokens || 0
-    }));
-    
-    // Get tokens by day
-    const allLogs = await prisma.aIUsageLog.findMany({
-      where: { createdAt: { gte: startDate } },
-      select: { createdAt: true, totalTokens: true }
-    });
-    
-    // Group by day
-    const byDayMap = new Map<string, { tokens: number; requests: number }>();
-    allLogs.forEach(log => {
-      const dateKey = log.createdAt.toISOString().split('T')[0];
-      const existing = byDayMap.get(dateKey) || { tokens: 0, requests: 0 };
-      byDayMap.set(dateKey, {
-        tokens: existing.tokens + log.totalTokens,
-        requests: existing.requests + 1
-      });
-    });
-    
-    const byDay = Array.from(byDayMap.entries()).map(([date, data]) => ({
-      date,
-      tokens: data.tokens,
-      requests: data.requests
-    })).sort((a, b) => a.date.localeCompare(b.date));
+    const aiModel = process.env.AI_MODEL || 'mistralai/devstral-2512:free';
     
     res.status(200).json({
-      period,
-      summary: {
-        totalTokens: tokenSummary._sum.totalTokens || 0,
-        inputTokens: tokenSummary._sum.promptTokens || 0,
-        outputTokens: tokenSummary._sum.completionTokens || 0,
-        totalRequests: tokenSummary._count || 0
-      },
-      byUser,
-      byDay
+      generationPaused: false,
+      activeJobs,
+      queuedJobs: 0,
+      failedJobsLast24h: failedLast24h,
+      averageGenerationTime: 0,
+      aiModelsHealth: [
+        { model: aiModel, status: 'healthy', failRate: 0 },
+      ],
     });
   } catch (error) {
     next(error);
   }
 };
 
-export const getRecap = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const type = req.query.type as string || 'weekly';
-    res.status(200).json({
-      type,
-      period: { start: new Date().toISOString(), end: new Date().toISOString() },
-      current: {
-        newUsers: 0,
-        totalAssignments: 0,
-        completedAssignments: 0,
-        totalTokensUsed: 0,
-        assignmentsByGrade: {},
-        assignmentsByLevel: {},
-        topUsers: []
-      },
-      previous: { newUsers: 0, totalAssignments: 0, totalTokensUsed: 0 },
-      growth: { users: 0, assignments: 0, tokens: 0 }
-    });
-  } catch (error) {
-    next(error);
-  }
+// Legacy placeholder exports for backward compatibility
+export const pauseAssignment = async (_req: AuthRequest, res: Response, _next: NextFunction) => {
+  res.status(200).json({ message: 'Not supported', status: 'DRAFT' });
 };
 
-export const getPendingApprovals = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    res.status(200).json({ count: 0, assignments: [] });
-  } catch (error) {
-    next(error);
-  }
+export const resumeAssignment = async (_req: AuthRequest, res: Response, _next: NextFunction) => {
+  res.status(200).json({ message: 'Not supported', status: 'DRAFT' });
 };
 
-export const approveAssignment = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    res.status(200).json({ success: true, message: 'Assignment approved' });
-  } catch (error) {
-    next(error);
-  }
+export const stopAssignment = cancelAssignment;
+
+export const restartAssignment = regenerateAssignment;
+
+export const getPendingApprovals = async (_req: AuthRequest, res: Response, _next: NextFunction) => {
+  res.status(200).json({ count: 0, assignments: [] });
 };
 
-export const rejectAssignment = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { reason } = req.body;
-    res.status(200).json({ success: true, message: 'Assignment rejected' });
-  } catch (error) {
-    next(error);
-  }
+export const approveAssignment = async (_req: AuthRequest, res: Response, _next: NextFunction) => {
+  res.status(200).json({ success: true, message: 'Not implemented' });
+};
+
+export const rejectAssignment = async (_req: AuthRequest, res: Response, _next: NextFunction) => {
+  res.status(200).json({ success: true, message: 'Not implemented' });
 };

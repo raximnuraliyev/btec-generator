@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth';
 import { createBriefSchema } from '../utils/validation';
-import { createBrief, getBriefs, getBriefById, updateBrief, deleteBrief } from '../services/brief.service';
+import { createBrief, getBriefs, getBriefById, updateBrief, deleteBrief, getBriefsWithStats } from '../services/brief.service';
 import { APIError } from '../types';
 
 export const create = async (
@@ -151,6 +151,27 @@ export const remove = async (
         return;
       }
     }
+    next(error);
+  }
+};
+
+export const getMyBriefsWithStats = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      } as APIError);
+      return;
+    }
+
+    const result = await getBriefsWithStats(req.user.userId);
+    res.status(200).json(result);
+  } catch (error) {
     next(error);
   }
 };

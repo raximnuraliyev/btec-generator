@@ -762,17 +762,47 @@ export async function getGenerationStatus(assignmentId: string, userId: string) 
     throw new Error('Unauthorized');
   }
 
+  // Calculate total expected blocks from plan
+  const totalBlocks = assignment.generationPlan 
+    ? (JSON.parse(assignment.generationPlan.planData as string)?.sections?.length || 5) 
+    : 5;
+  
+  // Determine stage based on status and progress
+  let stage: 'planning' | 'writing' | 'assembling' | 'completed' | 'failed' = 'planning';
+  if (assignment.status === 'FAILED') {
+    stage = 'failed';
+  } else if (assignment.status === 'COMPLETED') {
+    stage = 'completed';
+  } else if (assignment.contentBlocks.length > 0) {
+    stage = assignment.contentBlocks.length >= totalBlocks ? 'assembling' : 'writing';
+  } else if (assignment.generationPlan) {
+    stage = 'writing';
+  }
+
   return {
+    // Old format fields for compatibility
     id: assignment.id,
+    jobId: assignment.id,
     status: assignment.status,
+    currentStage: stage,
+    progress: {
+      stage,
+      blocksCompleted: assignment.contentBlocks.length,
+      totalBlocks,
+      currentBlock: assignment.contentBlocks[assignment.contentBlocks.length - 1]?.sectionId,
+    },
+    currentWordCount: assignment.content?.length || 0,
+    targetWordCount: 3000,
     totalTokensUsed: assignment.totalTokensUsed,
     totalAiCalls: assignment.totalAiCalls,
     generationDurationMs: assignment.generationDurationMs,
     error: assignment.error,
+    errorMessage: assignment.error,
     hasPlan: !!assignment.generationPlan,
     blocksGenerated: assignment.contentBlocks.length,
     contentBlocks: assignment.contentBlocks,
     createdAt: assignment.createdAt,
+    startedAt: assignment.createdAt,
     completedAt: assignment.completedAt,
   };
 }

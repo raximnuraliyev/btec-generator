@@ -1,3 +1,7 @@
+// =============================================================================
+// BTEC GENERATOR - ASSIGNMENT CONTROLLER
+// =============================================================================
+
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth';
 import { generateAssignmentSchema } from '../utils/validation';
@@ -8,10 +12,8 @@ import {
 } from '../services/assignment.service';
 import { startGeneration } from '../services/generation.service';
 import { generateDocx } from '../services/docx.service';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { APIError, GeneratedContent } from '../types';
-
-const prisma = new PrismaClient();
 
 export const generate = async (
   req: AuthRequest,
@@ -186,7 +188,7 @@ export const download = async (
       console.log('[DOWNLOAD] No DOCX path found, attempting to generate now...');
       
       try {
-        const content = assignment.content as GeneratedContent;
+        const content = assignment.content as unknown as GeneratedContent;
         const unitName = assignment.snapshot?.unitName || 'Assignment';
         const unitCode = assignment.snapshot?.unitCode || 'N/A';
         
@@ -228,7 +230,6 @@ export const download = async (
 
     // Stream the file to the client
     const fs = await import('fs');
-    const path = await import('path');
     
     console.log('[DOWNLOAD] docxPath:', docxPath);
     
@@ -315,7 +316,7 @@ export const deleteAssignment = async (
       return;
     }
 
-    if (assignment.userId !== req.user.id && req.user.role !== 'ADMIN') {
+    if (assignment.userId !== req.user.userId && req.user.role !== 'ADMIN') {
       res.status(403).json({
         error: 'Forbidden',
         message: 'You do not have permission to delete this assignment',

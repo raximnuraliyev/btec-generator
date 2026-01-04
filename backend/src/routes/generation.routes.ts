@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { authMiddleware } from '../middlewares/auth';
+import { Router, Response } from 'express';
+import { authMiddleware, AuthRequest } from '../middlewares/auth';
 import {
   startGeneration,
   getGenerationStatus,
@@ -9,7 +9,7 @@ import {
 const router = Router();
 
 // Start generation for an assignment
-router.post('/start/:assignmentId', authMiddleware, async (req, res) => {
+router.post('/start/:assignmentId', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const result = await startGeneration(req.params.assignmentId, req.user!.userId);
     res.json(result);
@@ -19,7 +19,7 @@ router.post('/start/:assignmentId', authMiddleware, async (req, res) => {
 });
 
 // Get generation status
-router.get('/status/:assignmentId', authMiddleware, async (req, res) => {
+router.get('/status/:assignmentId', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const status = await getGenerationStatus(req.params.assignmentId, req.user!.userId);
     res.json(status);
@@ -29,7 +29,7 @@ router.get('/status/:assignmentId', authMiddleware, async (req, res) => {
 });
 
 // Get assignment content (with all blocks)
-router.get('/content/:assignmentId', authMiddleware, async (req, res) => {
+router.get('/content/:assignmentId', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const content = await getAssignmentContent(req.params.assignmentId, req.user!.userId);
     res.json(content);

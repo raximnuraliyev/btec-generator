@@ -11,6 +11,7 @@
 
 // Use relative URLs - Vite proxy will handle routing to backend
 const API_BASE_URL = '/api';
+// @ts-ignore - import.meta.env is defined by Vite
 const WS_URL = import.meta.env.DEV ? 'ws://localhost:3000' : window.location.origin.replace(/^http/, 'ws');
 
 // =============================================================================
@@ -540,6 +541,17 @@ export const briefsApi = {
   },
 
   /**
+   * Get teacher's briefs with usage statistics
+   */
+  async getMyBriefsWithStats(): Promise<{
+    briefs: any[];
+    popularBriefs: any[];
+    stats: { totalBriefs: number; totalAssignments: number };
+  }> {
+    return api.get('/briefs/my-stats');
+  },
+
+  /**
    * Create a new brief (ADMIN/TEACHER only)
    */
   async createBrief(data: any): Promise<any> {
@@ -567,10 +579,18 @@ export const briefsApi = {
 
 export const adminApi = {
   // Users
-  getUsers: (page = 1, limit = 50, search = '') =>
-    api.get<{ users: any[]; total: number; page: number; pages: number }>(
-      `/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`
-    ),
+  getUsers: (params: { page?: number; limit?: number; search?: string; role?: string; plan?: string; status?: string } = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set('page', params.page.toString());
+    if (params.limit) queryParams.set('limit', params.limit.toString());
+    if (params.search) queryParams.set('search', params.search);
+    if (params.role) queryParams.set('role', params.role);
+    if (params.plan) queryParams.set('plan', params.plan);
+    if (params.status) queryParams.set('status', params.status);
+    return api.get<{ users: any[]; pagination: { total: number; page: number; totalPages: number } }>(
+      `/admin/users?${queryParams.toString()}`
+    );
+  },
 
   getUser: (id: string) =>
     api.get<{ user: any }>(`/admin/users/${id}`),
@@ -578,7 +598,25 @@ export const adminApi = {
   updateUser: (id: string, data: { email?: string; password?: string; name?: string; role?: string }) =>
     api.put<{ user: any }>(`/admin/users/${id}`, data),
 
+  updateUserRole: (id: string, role: string) =>
+    api.put<{ user: any }>(`/admin/users/${id}/role`, { role }),
+
   // Assignments
+  getAssignments: (params: { page?: number; limit?: number; search?: string; status?: string; grade?: string; level?: string; dateFrom?: string; dateTo?: string } = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set('page', params.page.toString());
+    if (params.limit) queryParams.set('limit', params.limit.toString());
+    if (params.search) queryParams.set('search', params.search);
+    if (params.status) queryParams.set('status', params.status);
+    if (params.grade) queryParams.set('grade', params.grade);
+    if (params.level) queryParams.set('level', params.level);
+    if (params.dateFrom) queryParams.set('dateFrom', params.dateFrom);
+    if (params.dateTo) queryParams.set('dateTo', params.dateTo);
+    return api.get<{ assignments: any[]; pagination: { total: number; page: number; totalPages: number } }>(
+      `/admin/assignments?${queryParams.toString()}`
+    );
+  },
+
   getAllAssignments: (page = 1, limit = 50, status?: string) =>
     api.get<{ assignments: any[]; total: number; page: number; pages: number }>(
       `/admin/all-assignments?page=${page}&limit=${limit}${status ? `&status=${status}` : ''}`
@@ -600,15 +638,50 @@ export const adminApi = {
     api.delete<{ message: string }>(`/admin/assignments/${id}`),
 
   // Logs
-  getLogs: (type: string, lines = 100) =>
-    api.get<{ type: string; lines: number; content: string; timestamp: string }>(
-      `/admin/logs/${type}?lines=${lines}`
-    ),
+  getLogs: (params: { page?: number; limit?: number; search?: string; category?: string; action?: string; dateFrom?: string; dateTo?: string } = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set('page', params.page.toString());
+    if (params.limit) queryParams.set('limit', params.limit.toString());
+    if (params.search) queryParams.set('search', params.search);
+    if (params.category) queryParams.set('category', params.category);
+    if (params.action) queryParams.set('action', params.action);
+    if (params.dateFrom) queryParams.set('dateFrom', params.dateFrom);
+    if (params.dateTo) queryParams.set('dateTo', params.dateTo);
+    return api.get<{ logs: any[]; pagination: { total: number; page: number; totalPages: number } }>(
+      `/admin/logs?${queryParams.toString()}`
+    );
+  },
 
-  getAuditLogs: (page = 1, limit = 100, filters?: { action?: string; entity?: string; userId?: string }) =>
-    api.get<{ logs: any[]; total: number; page: number; pages: number }>(
-      `/admin/logs/audit?page=${page}&limit=${limit}${filters?.action ? `&action=${filters.action}` : ''}${filters?.entity ? `&entity=${filters.entity}` : ''}${filters?.userId ? `&userId=${filters.userId}` : ''}`
-    ),
+  getAuditLogs: (params: { page?: number; limit?: number; search?: string; action?: string; dateFrom?: string; dateTo?: string } = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.set('page', params.page.toString());
+    if (params.limit) queryParams.set('limit', params.limit.toString());
+    if (params.search) queryParams.set('search', params.search);
+    if (params.action) queryParams.set('action', params.action);
+    if (params.dateFrom) queryParams.set('dateFrom', params.dateFrom);
+    if (params.dateTo) queryParams.set('dateTo', params.dateTo);
+    return api.get<{ logs: any[]; pagination: { total: number; page: number; totalPages: number } }>(
+      `/admin/logs/audit?${queryParams.toString()}`
+    );
+  },
+
+  // Issues
+  getIssues: (params: { status?: string; category?: string; priority?: string } = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.status) queryParams.set('status', params.status);
+    if (params.category) queryParams.set('category', params.category);
+    if (params.priority) queryParams.set('priority', params.priority);
+    return api.get<{ issues: any[] }>(`/admin/issues?${queryParams.toString()}`);
+  },
+
+  respondToIssue: (issueId: string, response: string) =>
+    api.post<{ success: boolean }>(`/admin/issues/${issueId}/respond`, { response }),
+
+  resolveIssue: (issueId: string) =>
+    api.post<{ success: boolean }>(`/admin/issues/${issueId}/resolve`),
+
+  reopenIssue: (issueId: string) =>
+    api.post<{ success: boolean }>(`/admin/issues/${issueId}/reopen`),
 
   // Stats
   getStats: () =>
@@ -695,6 +768,99 @@ export const adminApi = {
 
   rejectAssignment: (id: string, reason?: string) =>
     api.post<{ success: boolean; message: string }>(`/admin/assignments/${id}/reject`, { reason }),
+
+  // User Token Management (Admin)
+  addUserTokens: (userId: string, amount: number, reason: string) =>
+    api.post<{ success: boolean; newBalance: number }>(`/admin/users/${userId}/tokens/add`, { amount, reason }),
+
+  deductUserTokens: (userId: string, amount: number, reason: string) =>
+    api.post<{ success: boolean; newBalance: number }>(`/admin/users/${userId}/tokens/deduct`, { amount, reason }),
+
+  resetUserTokens: (userId: string, reason: string) =>
+    api.post<{ success: boolean; newBalance: number }>(`/admin/users/${userId}/tokens/reset`, { reason }),
+
+  setUserPlan: (userId: string, plan: string) =>
+    api.post<{ success: boolean }>(`/admin/users/${userId}/plan`, { plan }),
+
+  // User Status Management
+  suspendUser: (userId: string, reason: string) =>
+    api.post<{ success: boolean }>(`/admin/users/${userId}/suspend`, { reason }),
+
+  unsuspendUser: (userId: string) =>
+    api.post<{ success: boolean }>(`/admin/users/${userId}/unsuspend`),
+
+  banUser: (userId: string, reason: string) =>
+    api.post<{ success: boolean }>(`/admin/users/${userId}/ban`, { reason }),
+
+  unbanUser: (userId: string) =>
+    api.post<{ success: boolean }>(`/admin/users/${userId}/unban`),
+
+  resetUserState: (userId: string) =>
+    api.post<{ success: boolean }>(`/admin/users/${userId}/reset-state`),
+
+  // System Controls (Emergency)
+  pauseAllGeneration: () =>
+    api.post<{ success: boolean; message: string }>('/admin/system/pause-generation'),
+
+  resumeAllGeneration: () =>
+    api.post<{ success: boolean; message: string }>('/admin/system/resume-generation'),
+
+  getSystemStatus: () =>
+    api.get<{
+      generationPaused: boolean;
+      activeJobs: number;
+      queuedJobs: number;
+      failedJobsLast24h: number;
+      averageGenerationTime: number;
+      aiModelsHealth: { model: string; status: string; failRate: number }[];
+    }>('/admin/system/status'),
+
+  // Assignment Actions
+  forceCompleteAssignment: (id: string) =>
+    api.post<{ success: boolean }>(`/admin/assignments/${id}/force-complete`),
+
+  regenerateAssignment: (id: string) =>
+    api.post<{ success: boolean }>(`/admin/assignments/${id}/regenerate`),
+
+  cancelAssignment: (id: string) =>
+    api.post<{ success: boolean }>(`/admin/assignments/${id}/cancel`),
+
+  // Export
+  exportAssignments: async (filters?: any): Promise<Blob> => {
+    const token = localStorage.getItem('btec_token');
+    const queryParams = new URLSearchParams();
+    queryParams.set('format', 'csv');
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) queryParams.set(key, String(value));
+      });
+    }
+    const response = await fetch(`${API_BASE_URL}/admin/export/assignments?${queryParams.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error('Export failed');
+    return response.blob();
+  },
+
+  exportUsers: async (filters?: any): Promise<Blob> => {
+    const token = localStorage.getItem('btec_token');
+    const queryParams = new URLSearchParams();
+    queryParams.set('format', 'csv');
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) queryParams.set(key, String(value));
+      });
+    }
+    const response = await fetch(`${API_BASE_URL}/admin/export/users?${queryParams.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error('Export failed');
+    return response.blob();
+  },
 };
 
 // =============================================================================

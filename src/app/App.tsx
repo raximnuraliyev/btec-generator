@@ -11,6 +11,7 @@ import { MonitorPage } from './components/MonitorPage';
 import { ReviewPage } from './components/ReviewPage';
 import { AdminPage } from './components/AdminPage';
 import { IssuePage } from './components/IssuePage';
+import { SupportPage } from './components/SupportPage';
 import { TokenBalanceWidget } from './components/TokenBalanceWidget';
 import { TokenManagementPage } from './components/TokenManagementPage';
 import { BriefManagementPage } from './components/BriefManagementPage';
@@ -29,7 +30,7 @@ import { Toaster } from 'sonner';
  * Made by Ajax Manson
  */
 
-type Page = 'login' | 'dashboard' | 'how-to-use' | 'create' | 'profile' | 'monitor' | 'review' | 'admin' | 'issues' | 'tokens' | 'briefs' | 'create-brief' | 'preview' | 'teacher';
+type Page = 'login' | 'dashboard' | 'how-to-use' | 'create' | 'profile' | 'monitor' | 'review' | 'admin' | 'issues' | 'support' | 'tokens' | 'briefs' | 'create-brief' | 'preview' | 'teacher';
 
 export default function App() {
   return (
@@ -118,6 +119,9 @@ function Router() {
 
     case 'issues':
       return <IssuePage onNavigate={navigate} />;
+
+    case 'support':
+      return <SupportPage onBack={() => navigate('dashboard')} />;
 
     case 'tokens':
       return <TokenManagementPage onNavigate={navigate} />;

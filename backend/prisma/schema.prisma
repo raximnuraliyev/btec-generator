@@ -1,3 +1,10 @@
+// =============================================================================
+// BTEC GENERATOR - NEW ARCHITECTURE SCHEMA
+// =============================================================================
+// This is the ONLY source of truth for the database schema.
+// All legacy models have been removed.
+// =============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,24 +14,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =============================================================================
+// ENUMS
+// =============================================================================
+
 enum UserRole {
-  ADMIN
-  TEACHER
-  USER
-  VIP
+  ADMIN      // Full access to all features
+  TEACHER    // Can create and publish briefs only
+  USER       // Can generate assignments (limited by tokens/plan)
+  VIP        // Unlimited generation, no brief creation
 }
 
-enum Plan {
-  PASS
-  MERIT
-  DISTINCTION
-}
-
-enum AssignmentStatus {
-  DRAFT
-  GENERATING
-  COMPLETED
-  FAILED
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
 }
 
 enum Grade {
@@ -40,249 +44,23 @@ enum Language {
   es
 }
 
+enum AssignmentStatus {
+  DRAFT       // Created, not yet generating
+  GENERATING  // AI generation in progress
+  COMPLETED   // Generation finished successfully
+  FAILED      // Generation failed
+}
+
+enum BriefStatus {
+  DRAFT      // Not yet published
+  PUBLISHED  // Available for users to select
+}
+
 enum TokenPlanType {
   FREE
   BASIC
   PRO
   UNLIMITED
-}
-
-model User {
-  id                        String             @id @default(uuid())
-  email                     String             @unique
-  password                  String
-  role                      UserRole           @default(USER)
-  trialTokens               Int                @default(5000)
-  plan                      Plan?
-  assignmentsUsedInPlan     Int                @default(0)
-  totalTokensUsedAllTime    Int                @default(0)
-  totalAssignmentsGenerated Int                @default(0)
-  lastGenerationAt          DateTime?
-  createdAt                 DateTime           @default(now())
-  updatedAt                 DateTime           @updatedAt
-  
-  studentProfile      StudentProfile?
-  briefs              Brief[]
-  assignments         Assignment[]
-  userFlags           UserFlag[]
-  tokenPlan           TokenPlan?
-  tokenTransactions   TokenTransaction[]
-  issues              Issue[]
-  
-  @@index([email])
-  @@index([role])
-}
-
-model StudentProfile {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  fullName       String
-  universityName String
-  faculty        String
-  groupName      String
-  city           String
-  academicYear   String?
-  confirmedAt    DateTime @default(now())
-  createdAt      DateTime @default(now())
-  
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-}
-
-model UserFlag {
-  id          String   @id @default(uuid())
-  userId      String
-  reason      String
-  description String?  @db.Text
-  severity    String   @default("LOW")
-  resolved    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  resolvedAt  DateTime?
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([resolved])
-}
-
-model Brief {
-  id                    String   @id @default(uuid())
-  
-  // Core identifiers
-  subjectName           String
-  unitName              String
-  unitCode              String
-  level                 Int
-  semester              String   // "1" or "2"
-  
-  // Learning content
-  learningAims          String[]
-  vocationalScenario    String   @db.Text
-  
-  // Tasks structure
-  tasks                 Json     // Array of TaskBlock objects
-  
-  // Assessment criteria  
-  assessmentCriteria    Json     // { pass: string[], merit: string[], distinction: string[] }
-  
-  // Additional requirements
-  checklistOfEvidence   String[]
-  sourcesOfInformation  String[]
-  
-  // Publishing control
-  status                String   @default("DRAFT") // "DRAFT" | "PUBLISHED"
-  
-  // Metadata
-  createdById           String
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
-  createdBy             User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  snapshots             ResolvedBriefSnapshot[]
-  
-  @@unique([unitCode, level, semester], name: "unique_brief")
-  @@index([level])
-  @@index([createdById])
-  @@index([status])
-}
-
-model ResolvedBriefSnapshot {
-  id                    String   @id @default(uuid())
-  briefId               String
-  
-  // Snapshot of brief data at generation time
-  subjectName           String
-  unitName              String
-  unitCode              String
-  level                 Int
-  semester              String
-  learningAims          String[]
-  vocationalScenario    String   @db.Text
-  tasks                 Json
-  assessmentCriteria    Json
-  checklistOfEvidence   String[]
-  sourcesOfInformation  String[]
-  
-  // Generation settings
-  language              Language
-  includeImages         Boolean  @default(false)
-  includeTables         Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  
-  brief                 Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
-  assignment            Assignment?
-  
-  @@index([briefId])
-}
-
-model Assignment {
-  id                     String           @id @default(uuid())
-  language               Language
-  userId                 String
-  snapshotId             String           @unique
-  grade                  Grade
-  includeImages          Boolean          @default(false)
-  includeTables          Boolean          @default(false)
-  status                 AssignmentStatus @default(DRAFT)
-  totalTokensUsed        Int              @default(0)
-  totalAiCalls           Int              @default(0)
-  modelsUsed             String[]         @default([])
-  generationDurationMs   Int?
-  content                Json?
-  guidance               Json?            // Writing guidance (instructional, separate from content)
-  docxUrl                String?
-  error                  String?
-  createdAt              DateTime         @default(now())
-  completedAt            DateTime?
-  
-  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  snapshot               ResolvedBriefSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-  aiUsageLogs            AIUsageLog[]
-  generationPlan         GenerationPlan?
-  contentBlocks          ContentBlock[]
-  
-  @@index([userId])
-  @@index([status])
-}
-
-model AIUsageLog {
-  id                String    @id @default(uuid())
-  assignmentId      String?
-  userId            String
-  userRole          UserRole
-  aiProvider        String
-  aiModel           String
-  promptTokens      Int
-  completionTokens  Int
-  totalTokens       Int
-  purpose           String
-  createdAt         DateTime  @default(now())
-  
-  assignment        Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  
-  @@index([assignmentId])
-  @@index([userId])
-  @@index([createdAt])
-}
-
-model TokenPlan {
-  id                  String         @id @default(uuid())
-  userId              String         @unique
-  planType            TokenPlanType  @default(FREE)
-  tokensPerMonth      Int            @default(5000)
-  tokensRemaining     Int            @default(5000)
-  resetAt             DateTime?
-  activatedAt         DateTime       @default(now())
-  expiresAt           DateTime?
-  
-  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([planType])
-}
-
-model TokenTransaction {
-  id                String    @id @default(uuid())
-  userId            String
-  assignmentId      String?
-  tokensUsed        Int
-  tokensRemaining   Int
-  purpose           String
-  createdAt         DateTime  @default(now())
-  
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
-  @@index([createdAt])
-}
-
-model GenerationPlan {
-  id                String    @id @default(uuid())
-  assignmentId      String    @unique
-  planData          Json
-  tokensUsed        Int       @default(0)
-  createdAt         DateTime  @default(now())
-  
-  assignment        Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  
-  @@index([assignmentId])
-}
-
-model ContentBlock {
-  id                String    @id @default(uuid())
-  assignmentId      String
-  sectionId         String
-  criterionCode     String?
-  blockOrder        Int
-  content           String    @db.Text
-  tokensUsed        Int       @default(0)
-  generatedAt       DateTime  @default(now())
-  
-  assignment        Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  
-  @@index([assignmentId])
-  @@index([assignmentId, blockOrder])
 }
 
 enum IssueCategory {
@@ -301,22 +79,386 @@ enum IssueStatus {
   CLOSED
 }
 
+// =============================================================================
+// USER MODEL
+// =============================================================================
+
+model User {
+  id                        String             @id @default(uuid())
+  email                     String             @unique
+  password                  String
+  name                      String?
+  role                      UserRole           @default(USER)
+  status                    UserStatus         @default(ACTIVE)
+  totalTokensUsedAllTime    Int                @default(0)
+  totalAssignmentsGenerated Int                @default(0)
+  lastGenerationAt          DateTime?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  
+  // Relations
+  studentProfile      StudentProfile?
+  briefs              Brief[]
+  assignments         Assignment[]
+  tokenPlan           TokenPlan?
+  tokenTransactions   TokenTransaction[]
+  issues              Issue[]
+  aiUsageLogs         AIUsageLog[]
+  
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+// =============================================================================
+// STUDENT PROFILE MODEL
+// =============================================================================
+// User's academic profile - required before generating assignments
+
+model StudentProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  fullName       String
+  universityName String
+  faculty        String
+  groupName      String
+  city           String
+  academicYear   String?
+  confirmedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+// =============================================================================
+// BRIEF MODEL
+// =============================================================================
+// Created by ADMIN or TEACHER only
+// Stored as structured data (no file uploads)
+// Only PUBLISHED briefs are selectable by users
+
+model Brief {
+  id                    String      @id @default(uuid())
+  
+  // Core identifiers
+  subjectName           String
+  unitName              String
+  unitCode              String
+  level                 Int         // 3, 4, 5, or 6
+  semester              String      // "1" or "2"
+  
+  // Learning content
+  learningAims          String[]    // Array of learning aims
+  vocationalScenario    String      @db.Text
+  
+  // Tasks structure
+  tasks                 Json        // Array of TaskBlock objects
+  
+  // Assessment criteria - { pass: [{code, description}], merit: [...], distinction: [...] }
+  assessmentCriteria    Json
+  
+  // Additional requirements
+  checklistOfEvidence   String[]
+  sourcesOfInformation  String[]
+  
+  // Publishing control
+  status                BriefStatus @default(DRAFT)
+  
+  // Metadata
+  createdById           String
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  // Relations
+  createdBy             User        @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  snapshots             ResolvedBriefSnapshot[]
+  
+  @@unique([unitCode, level, semester], name: "unique_brief")
+  @@index([level])
+  @@index([createdById])
+  @@index([status])
+}
+
+// =============================================================================
+// RESOLVED BRIEF SNAPSHOT MODEL
+// =============================================================================
+// IMMUTABLE snapshot of brief at time of assignment creation
+// Once created, this data is NEVER changed
+// All generation reads from snapshot, not from Brief table
+
+model ResolvedBriefSnapshot {
+  id                    String   @id @default(uuid())
+  briefId               String
+  
+  // Complete copy of brief data at snapshot time
+  subjectName           String
+  unitName              String
+  unitCode              String
+  level                 Int
+  semester              String
+  learningAims          String[]
+  vocationalScenario    String   @db.Text
+  tasks                 Json
+  assessmentCriteria    Json
+  checklistOfEvidence   String[]
+  sourcesOfInformation  String[]
+  
+  // Generation settings captured at snapshot time
+  language              Language
+  includeImages         Boolean  @default(false)
+  includeTables         Boolean  @default(false)
+  
+  // Metadata
+  createdAt             DateTime @default(now())
+  
+  // Relations
+  brief                 Brief    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  assignment            Assignment?
+  
+  @@index([briefId])
+}
+
+// =============================================================================
+// ASSIGNMENT MODEL
+// =============================================================================
+// Core assignment record - references snapshot, NOT brief
+
+model Assignment {
+  id                     String           @id @default(uuid())
+  userId                 String
+  snapshotId             String           @unique
+  
+  // User selections
+  grade                  Grade
+  language               Language
+  includeImages          Boolean          @default(false)
+  includeTables          Boolean          @default(false)
+  
+  // Status tracking
+  status                 AssignmentStatus @default(DRAFT)
+  
+  // Generation metrics
+  totalTokensUsed        Int              @default(0)
+  totalAiCalls           Int              @default(0)
+  modelsUsed             String[]         @default([])
+  generationDurationMs   Int?
+  
+  // Generated content
+  content                Json?            // Full generated content structure
+  guidance               Json?            // Writing guidance (instructional)
+  docxUrl                String?          // Path to generated DOCX file
+  error                  String?          // Error message if failed
+  
+  // Timestamps
+  createdAt              DateTime         @default(now())
+  completedAt            DateTime?
+  
+  // Relations
+  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshot               ResolvedBriefSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  aiUsageLogs            AIUsageLog[]
+  generationPlan         GenerationPlan?
+  contentBlocks          ContentBlock[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// GENERATION PLAN MODEL
+// =============================================================================
+// Stores the planner output - document structure blueprint
+
+model GenerationPlan {
+  id                String    @id @default(uuid())
+  assignmentId      String    @unique
+  
+  // Plan data - ordered document structure
+  planData          Json      // { sections, criteria mapping, etc. }
+  
+  // Metrics
+  tokensUsed        Int       @default(0)
+  createdAt         DateTime  @default(now())
+  
+  // Relations
+  assignment        Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  
+  @@index([assignmentId])
+}
+
+// =============================================================================
+// CONTENT BLOCK MODEL
+// =============================================================================
+// Individual content blocks generated by writer
+// Each criterion = ONE content block
+
+model ContentBlock {
+  id                String    @id @default(uuid())
+  assignmentId      String
+  
+  // Block identification
+  sectionId         String    // e.g., "introduction", "learning_aim_a", "conclusion"
+  criterionCode     String?   // e.g., "P1", "M1", "D1" (null for intro/conclusion)
+  blockOrder        Int       // Order in document
+  
+  // Content
+  content           String    @db.Text
+  
+  // Metrics
+  tokensUsed        Int       @default(0)
+  generatedAt       DateTime  @default(now())
+  
+  // Relations
+  assignment        Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  
+  @@index([assignmentId])
+  @@index([assignmentId, blockOrder])
+}
+
+// =============================================================================
+// AI USAGE LOG MODEL
+// =============================================================================
+// Tracks all AI API calls for analytics and billing
+
+model AIUsageLog {
+  id                String    @id @default(uuid())
+  assignmentId      String?
+  userId            String
+  userRole          UserRole
+  
+  // AI call details
+  aiProvider        String    // e.g., "openai", "anthropic"
+  aiModel           String    // e.g., "gpt-4o-mini"
+  promptTokens      Int
+  completionTokens  Int
+  totalTokens       Int
+  purpose           String    // e.g., "planner", "writer", "guidance"
+  
+  // Metadata
+  createdAt         DateTime  @default(now())
+  
+  // Relations
+  assignment        Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([assignmentId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// TOKEN PLAN MODEL
+// =============================================================================
+// User's token plan and balance
+
+model TokenPlan {
+  id                  String         @id @default(uuid())
+  userId              String         @unique
+  planType            TokenPlanType  @default(FREE)
+  tokensPerMonth      Int            @default(5000)
+  tokensRemaining     Int            @default(5000)
+  resetAt             DateTime?
+  activatedAt         DateTime       @default(now())
+  expiresAt           DateTime?
+  
+  // Relations
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([planType])
+}
+
+// =============================================================================
+// TOKEN TRANSACTION MODEL
+// =============================================================================
+// History of token usage and additions
+
+model TokenTransaction {
+  id                String    @id @default(uuid())
+  userId            String
+  assignmentId      String?
+  tokensUsed        Int
+  tokensRemaining   Int
+  purpose           String    // e.g., "ASSIGNMENT_GENERATION", "ADMIN_ADJUSTMENT"
+  createdAt         DateTime  @default(now())
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// ISSUE MODEL
+// =============================================================================
+// User support tickets
+
 model Issue {
   id                String         @id @default(uuid())
   userId            String
+  
+  // Issue details
   title             String
   description       String         @db.Text
   category          IssueCategory
+  priority          String         @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
   screenshot        String?        @db.Text
+  
+  // Status tracking
   status            IssueStatus    @default(OPEN)
-  priority          String         @default("MEDIUM")
   adminResponse     String?        @db.Text
+  
+  // Timestamps
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   
+  // Relations
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@index([userId])
   @@index([status])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// SYSTEM LOG MODEL
+// =============================================================================
+// System-level logging for debugging and monitoring
+
+model SystemLog {
+  id                String    @id @default(uuid())
+  level             String    // INFO, WARN, ERROR, DEBUG
+  category          String    // GENERATION, AUTH, ADMIN, etc.
+  message           String    @db.Text
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  
+  @@index([level])
+  @@index([category])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// AUDIT LOG MODEL
+// =============================================================================
+// Admin action logging for compliance
+
+model AuditLog {
+  id                String    @id @default(uuid())
+  adminUserId       String
+  action            String    // USER_ROLE_CHANGE, TOKEN_ADJUSTMENT, etc.
+  targetType        String    // USER, ASSIGNMENT, BRIEF, etc.
+  targetId          String
+  previousValue     Json?
+  newValue          Json?
+  createdAt         DateTime  @default(now())
+  
+  @@index([adminUserId])
+  @@index([action])
   @@index([createdAt])
 }

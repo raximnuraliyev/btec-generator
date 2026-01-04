@@ -11,7 +11,7 @@ import { generationApi } from '../services/api';
 const DISCORD_INVITE_LINK = 'https://discord.gg/vBNRXCdd';
 
 interface DashboardPageProps {
-  onNavigate: (page: 'create' | 'monitor' | 'review' | 'how-to-use' | 'admin' | 'issues' | 'profile' | 'tokens' | 'teacher' | 'briefs', assignmentId?: string) => void;
+  onNavigate: (page: 'create' | 'monitor' | 'review' | 'how-to-use' | 'admin' | 'issues' | 'support' | 'profile' | 'tokens' | 'teacher' | 'briefs', assignmentId?: string) => void;
 }
 
 /**
@@ -111,11 +111,11 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
               </button>
             )}
             <button
-              onClick={() => onNavigate('issues')}
+              onClick={() => onNavigate('support')}
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200 transition-colors"
             >
               <AlertCircle className="w-4 h-4" />
-              Issues
+              Support
             </button>
             <a
               href={DISCORD_INVITE_LINK}

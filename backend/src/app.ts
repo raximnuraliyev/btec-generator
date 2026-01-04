@@ -28,7 +28,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/exports', express.static(path.join(process.cwd(), 'exports')));
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

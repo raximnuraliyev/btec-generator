@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { Language } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { logAIUsage } from './admin.service';
 import { LANGUAGE_CONFIGS } from '../utils/language';
@@ -124,13 +125,13 @@ Do NOT exceed the academic scope of the criterion.`;
 
 export async function generateContentBlock(
   briefSnapshot: BriefSnapshot,
-  generationPlan: GenerationPlan,
+  _generationPlan: GenerationPlan,
   task: WritingTask,
   userId: string,
   assignmentId: string,
   blockOrder: number
 ): Promise<string> {
-  const language = briefSnapshot.language || 'en';
+  const language = (briefSnapshot.language || 'en') as Language;
   const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
 
   // Determine grade level and depth requirements
@@ -322,12 +323,12 @@ function findCriterion(assessmentCriteria: any, code: string): any {
  */
 export async function generateIntroduction(
   briefSnapshot: BriefSnapshot,
-  generationPlan: GenerationPlan,
+  _generationPlan: GenerationPlan,
   userId: string,
   assignmentId: string,
   blockOrder: number
 ): Promise<string> {
-  const language = briefSnapshot.language || 'en';
+  const language = (briefSnapshot.language || 'en') as Language;
   const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
 
   const learningAimsText = briefSnapshot.learningAims
@@ -411,14 +412,14 @@ Write the introduction now. Output ONLY the introduction text, nothing else.`;
  */
 export async function generateLearningAimContent(
   briefSnapshot: BriefSnapshot,
-  generationPlan: GenerationPlan,
+  _generationPlan: GenerationPlan,
   section: any,
   previousSummary: string,
   userId: string,
   assignmentId: string,
   blockOrder: number
 ): Promise<string> {
-  const language = briefSnapshot.language || 'en';
+  const language = (briefSnapshot.language || 'en') as Language;
   const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
 
   const prompt = `Write a LEARNING AIM CONTEXT BLOCK for a BTEC assignment.
@@ -501,13 +502,13 @@ Write the learning aim context now. Output ONLY the context text, nothing else.`
  */
 export async function generateConclusion(
   briefSnapshot: BriefSnapshot,
-  generationPlan: GenerationPlan,
+  _generationPlan: GenerationPlan,
   previousSummary: string,
   userId: string,
   assignmentId: string,
   blockOrder: number
 ): Promise<string> {
-  const language = briefSnapshot.language || 'en';
+  const language = (briefSnapshot.language || 'en') as Language;
   const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
 
   const learningAimsText = briefSnapshot.learningAims
@@ -599,7 +600,8 @@ export async function generateReferences(
   assignmentId: string,
   blockOrder: number
 ): Promise<Reference[]> {
-  const language = briefSnapshot.language || 'en';
+  // Language is available from briefSnapshot but not currently used in prompt
+  // const language = briefSnapshot.language || 'en';
 
   // Determine reference count based on grade
   const refCount = targetGrade === 'PASS' ? 3 : targetGrade === 'MERIT' ? 5 : 8;
@@ -706,7 +708,7 @@ export async function generateLearningAimBlock(
   assignmentId: string,
   blockOrder: number
 ): Promise<string> {
-  const language = briefSnapshot.language || 'en';
+  const language = (briefSnapshot.language || 'en') as Language;
   const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
 
   const prompt = `Write a LEARNING AIM INTRODUCTION for a BTEC assignment.
@@ -796,7 +798,7 @@ export async function generateCriterionBlock(
   assignmentId: string,
   blockOrder: number
 ): Promise<string> {
-  const language = briefSnapshot.language || 'en';
+  const language = (briefSnapshot.language || 'en') as Language;
   const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
 
   // Determine grade level and depth requirements
@@ -907,7 +909,7 @@ export async function generateCriterionTable(
   tableType: string,
   userId: string,
   assignmentId: string,
-  blockOrder: number
+  _blockOrder: number
 ): Promise<TableData> {
   const prompt = `Generate a TABLE for a BTEC assignment criterion.
 

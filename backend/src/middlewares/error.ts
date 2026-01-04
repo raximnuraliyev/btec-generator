@@ -4,9 +4,9 @@ import { APIError } from '../types';
 
 export const errorHandler = (
   error: Error,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   if (error instanceof ZodError) {
     // Format error messages nicely

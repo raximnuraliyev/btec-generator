@@ -1,9 +1,12 @@
-import { PrismaClient } from '@prisma/client';
+// =============================================================================
+// BTEC GENERATOR - AUTH SERVICE
+// =============================================================================
+
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
 import { AuthResponse, JWTPayload } from '../types';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
+import { UserStatus } from '@prisma/client';
 
 export const registerUser = async (
   email: string,
@@ -23,6 +26,10 @@ export const registerUser = async (
     data: {
       email,
       password: hashedPassword,
+      status: UserStatus.ACTIVE,
+    },
+    include: {
+      tokenPlan: true,
     },
   });
 
@@ -39,9 +46,14 @@ export const registerUser = async (
     user: {
       id: user.id,
       email: user.email,
+      name: user.name,
       role: user.role,
-      trialTokens: user.trialTokens,
-      plan: user.plan,
+      status: user.status,
+      tokenPlan: user.tokenPlan ? {
+        planType: user.tokenPlan.planType,
+        tokensRemaining: user.tokenPlan.tokensRemaining,
+        tokensPerMonth: user.tokenPlan.tokensPerMonth,
+      } : null,
     },
   };
 };
@@ -52,10 +64,23 @@ export const loginUser = async (
 ): Promise<AuthResponse> => {
   const user = await prisma.user.findUnique({
     where: { email },
+    include: {
+      tokenPlan: true,
+    },
   });
 
   if (!user) {
     throw new Error('Invalid email or password');
+  }
+
+  // Check if user is banned
+  if (user.status === UserStatus.BANNED) {
+    throw new Error('Your account has been banned');
+  }
+
+  // Check if user is suspended
+  if (user.status === UserStatus.SUSPENDED) {
+    throw new Error('Your account is temporarily suspended');
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -77,9 +102,14 @@ export const loginUser = async (
     user: {
       id: user.id,
       email: user.email,
+      name: user.name,
       role: user.role,
-      trialTokens: user.trialTokens,
-      plan: user.plan,
+      status: user.status,
+      tokenPlan: user.tokenPlan ? {
+        planType: user.tokenPlan.planType,
+        tokensRemaining: user.tokenPlan.tokensRemaining,
+        tokensPerMonth: user.tokenPlan.tokensPerMonth,
+      } : null,
     },
   };
 };

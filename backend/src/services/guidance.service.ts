@@ -153,10 +153,14 @@ Return as JSON:
     max_tokens: 2000,
   });
 
-  await logAIUsage(assignmentId, 'guidance_overview', GUIDANCE_MODEL, {
+  await logAIUsage({
+    assignmentId,
+    aiProvider: 'OpenRouter',
+    aiModel: GUIDANCE_MODEL,
     promptTokens: completion.usage?.prompt_tokens || 0,
     completionTokens: completion.usage?.completion_tokens || 0,
     totalTokens: completion.usage?.total_tokens || 0,
+    purpose: 'guidance_overview',
   });
   
   const responseContent = completion.choices[0].message.content || '';
@@ -286,10 +290,14 @@ Return as JSON:
     max_tokens: 1500,
   });
 
-  await logAIUsage(assignmentId, `guidance_criterion_${criterion.code}`, GUIDANCE_MODEL, {
+  await logAIUsage({
+    assignmentId,
+    aiProvider: 'OpenRouter',
+    aiModel: GUIDANCE_MODEL,
     promptTokens: completion.usage?.prompt_tokens || 0,
     completionTokens: completion.usage?.completion_tokens || 0,
     totalTokens: completion.usage?.total_tokens || 0,
+    purpose: `guidance_criterion_${criterion.code}`,
   });
   
   const responseContent = completion.choices[0].message.content || '';

@@ -1,9 +1,11 @@
+// =============================================================================
+// BTEC GENERATOR - ISSUE CONTROLLER
+// =============================================================================
+
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { APIError } from '../types';
-
-const prisma = new PrismaClient();
 
 export const createIssue = async (
   req: AuthRequest,
@@ -21,11 +23,23 @@ export const createIssue = async (
 
     const { title, description, category, screenshot } = req.body;
 
+    // Map frontend category values to Prisma IssueCategory enum
+    const categoryMap: Record<string, string> = {
+      'GENERATION': 'GENERATION_ISSUE',
+      'ACCOUNT': 'ACCOUNT_ISSUE',
+      'TOKENS': 'OTHER',
+      'BUG': 'BUG',
+      'FEATURE': 'FEATURE_REQUEST',
+      'OTHER': 'OTHER',
+      'DOWNLOAD': 'DOWNLOAD_ISSUE',
+    };
+    const mappedCategory = categoryMap[category] || 'OTHER';
+
     const issue = await prisma.issue.create({
       data: {
         title,
         description,
-        category,
+        category: mappedCategory as any,
         screenshot,
         userId: req.user.userId,
         status: 'OPEN',

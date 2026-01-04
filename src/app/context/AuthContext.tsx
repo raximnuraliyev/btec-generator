@@ -6,6 +6,7 @@ interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   signup: (data: SignUpData) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isAdmin: boolean;
   isVIP: boolean;
 }
@@ -198,6 +199,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  /**
+   * Refresh user data from server
+   */
+  const refreshUser = async (): Promise<void> => {
+    try {
+      const response = await authApi.getProfile();
+      if (response && response.user) {
+        const user: User = {
+          id: response.user.id,
+          email: response.user.email,
+          name: response.user.name,
+          role: response.user.role as UserRole,
+          createdAt: new Date()
+        };
+        
+        setAuthState(prev => ({
+          ...prev,
+          user
+        }));
+        
+        localStorage.setItem('btec_user', JSON.stringify(user));
+      }
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+  };
+
   const isAdmin = authState.user?.role === 'ADMIN';
   const isVIP = authState.user?.role === 'VIP' || authState.user?.role === 'ADMIN';
 
@@ -208,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         signup,
         logout,
+        refreshUser,
         isAdmin,
         isVIP,
       }}

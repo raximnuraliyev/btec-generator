@@ -1,8 +1,10 @@
-import { PrismaClient } from '@prisma/client';
-import { AssessmentCriteria } from '../types';
-import { z } from 'zod';
+// =============================================================================
+// BTEC GENERATOR - BRIEF SERVICE
+// =============================================================================
 
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
+// AssessmentCriteria type used in runtime JSON parsing
+import { z } from 'zod';
 
 // Task block schema
 const taskBlockSchema = z.object({
@@ -233,4 +235,49 @@ export const getBriefById = async (briefId: string) => {
   }
 
   return brief;
+};
+
+/**
+ * Get briefs with usage statistics for a teacher's dashboard
+ */
+export const getBriefsWithStats = async (createdById: string) => {
+  // Get all briefs by this teacher
+  const briefs = await prisma.brief.findMany({
+    where: { createdById },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (briefs.length === 0) {
+    return { briefs: [], stats: { totalBriefs: 0, totalAssignments: 0 } };
+  }
+
+  const briefIds = briefs.map(b => b.id);
+
+  // Get assignment counts per brief via snapshots
+  const assignmentCounts = await prisma.resolvedBriefSnapshot.groupBy({
+    by: ['briefId'],
+    where: { briefId: { in: briefIds } },
+    _count: { id: true },
+  });
+
+  // Create a map of briefId -> assignment count
+  const countMap = new Map(assignmentCounts.map(c => [c.briefId, c._count.id]));
+
+  // Map briefs with their counts
+  const briefsWithStats = briefs.map(brief => ({
+    ...brief,
+    usageCount: countMap.get(brief.id) || 0,
+  }));
+
+  // Sort by usage for popular briefs
+  const sortedByUsage = [...briefsWithStats].sort((a, b) => b.usageCount - a.usageCount);
+
+  return {
+    briefs: briefsWithStats,
+    popularBriefs: sortedByUsage.slice(0, 5),
+    stats: {
+      totalBriefs: briefs.length,
+      totalAssignments: briefsWithStats.reduce((sum, b) => sum + b.usageCount, 0),
+    },
+  };
 };
