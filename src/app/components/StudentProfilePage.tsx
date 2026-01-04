@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Alert, AlertDescription } from './ui/alert';
-import { Loader2, AlertCircle, CheckCircle2, User, GraduationCap, School } from 'lucide-react';
+import { 
+  ArrowLeft, User, School, MapPin, Save,
+  CheckCircle, AlertCircle, Loader2
+} from 'lucide-react';
 import { studentsApi } from '../services/api';
 
 interface Profile {
@@ -23,6 +23,7 @@ interface StudentProfilePageProps {
 
 export default function StudentProfilePage({ onNavigate }: StudentProfilePageProps) {
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [hasExisting, setHasExisting] = useState(false);
@@ -41,6 +42,7 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
   }, []);
 
   const loadProfile = async () => {
+    setLoading(true);
     try {
       const response = await studentsApi.getProfile();
       if (response.confirmed && response.profile) {
@@ -48,7 +50,9 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
         setHasExisting(true);
       }
     } catch (err) {
-      // Profile doesn't exist yet
+      // Profile doesn't exist yet - that's fine
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,166 +63,232 @@ export default function StudentProfilePage({ onNavigate }: StudentProfilePagePro
 
     // Validation
     if (!profile.fullName || !profile.universityName || !profile.faculty || !profile.groupName || !profile.city) {
-      setError('Please fill in all required fields (Full Name, University, Faculty, Group/Class, City)');
+      setError('Please fill in all required fields');
       return;
     }
 
     try {
-      setLoading(true);
+      setSaving(true);
       await studentsApi.saveProfile(profile);
       setSuccess(true);
-      setTimeout(() => onNavigate('dashboard'), 2000);
+      setHasExisting(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to save profile');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  return (
-    <div className="container max-w-3xl mx-auto py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <GraduationCap className="h-6 w-6" />
-            {hasExisting ? 'Update Academic Profile' : 'Complete Your Academic Profile'}
-          </CardTitle>
-          <CardDescription>
-            This information is required to generate personalized assignments. All fields are private and secure.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Personal Information */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <User className="h-4 w-4" />
-                Personal Information
-              </div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name *</Label>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b-2 border-black">
+        <div className="max-w-3xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => onNavigate('dashboard')}
+              className="hover:bg-gray-100"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-xl font-bold">
+              {hasExisting ? 'Update Academic Profile' : 'Complete Your Academic Profile'}
+            </h1>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        {/* Info Banner */}
+        <div className="bg-white border-2 border-black p-4 mb-6">
+          <p className="text-gray-600">
+            <strong>Why we need this:</strong> Your academic information is used to personalize your assignments. 
+            This includes adding your name, university, and department to generated documents.
+          </p>
+        </div>
+
+        {/* Success Message */}
+        {success && (
+          <div className="bg-green-50 border-2 border-green-500 p-4 mb-6 flex items-center gap-3">
+            <CheckCircle className="w-5 h-5 text-green-500" />
+            <p className="text-green-700 font-medium">Profile saved successfully!</p>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border-2 border-red-500 p-4 mb-6 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500" />
+            <p className="text-red-700 font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit}>
+          {/* Personal Information Section */}
+          <div className="bg-white border-2 border-black mb-6">
+            <div className="bg-black text-white px-4 py-3 flex items-center gap-2">
+              <User className="w-5 h-5" />
+              <h2 className="font-bold">Personal Information</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <Label htmlFor="fullName" className="text-sm font-bold mb-2 block">
+                  Full Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="fullName"
                   value={profile.fullName}
                   onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
                   placeholder="Enter your full legal name"
+                  className="border-2 border-black focus:ring-2 focus:ring-black"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">This will appear on your assignments</p>
               </div>
             </div>
+          </div>
 
-            {/* Academic Information */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <School className="h-4 w-4" />
-                Academic Information
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="universityName">University/College Name *</Label>
+          {/* Academic Information Section */}
+          <div className="bg-white border-2 border-black mb-6">
+            <div className="bg-black text-white px-4 py-3 flex items-center gap-2">
+              <School className="w-5 h-5" />
+              <h2 className="font-bold">Academic Information</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <Label htmlFor="universityName" className="text-sm font-bold mb-2 block">
+                  University/College Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="universityName"
                   value={profile.universityName}
                   onChange={(e) => setProfile({ ...profile, universityName: e.target.value })}
-                  placeholder="Enter your institution name"
+                  placeholder="e.g., Westminster International University"
+                  className="border-2 border-black focus:ring-2 focus:ring-black"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="faculty">Faculty/Department *</Label>
+              <div>
+                <Label htmlFor="faculty" className="text-sm font-bold mb-2 block">
+                  Faculty/Department <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="faculty"
                   value={profile.faculty}
                   onChange={(e) => setProfile({ ...profile, faculty: e.target.value })}
                   placeholder="e.g., Faculty of Computing, Business School"
+                  className="border-2 border-black focus:ring-2 focus:ring-black"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="groupName">Group/Class Name *</Label>
+              <div>
+                <Label htmlFor="groupName" className="text-sm font-bold mb-2 block">
+                  Group/Class Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="groupName"
                   value={profile.groupName}
                   onChange={(e) => setProfile({ ...profile, groupName: e.target.value })}
-                  placeholder="e.g., Group A, Class 2024"
+                  placeholder="e.g., Group A, CS-2024"
+                  className="border-2 border-black focus:ring-2 focus:ring-black"
                   required
                 />
               </div>
+            </div>
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="city">City *</Label>
+          {/* Location Section */}
+          <div className="bg-white border-2 border-black mb-6">
+            <div className="bg-black text-white px-4 py-3 flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              <h2 className="font-bold">Location</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <Label htmlFor="city" className="text-sm font-bold mb-2 block">
+                  City <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="city"
                   value={profile.city}
                   onChange={(e) => setProfile({ ...profile, city: e.target.value })}
-                  placeholder="Your city"
+                  placeholder="e.g., Tashkent"
+                  className="border-2 border-black focus:ring-2 focus:ring-black"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="academicYear">Academic Year (Optional)</Label>
+              <div>
+                <Label htmlFor="academicYear" className="text-sm font-bold mb-2 block">
+                  Academic Year <span className="text-gray-400">(Optional)</span>
+                </Label>
                 <Input
                   id="academicYear"
                   value={profile.academicYear || ''}
                   onChange={(e) => setProfile({ ...profile, academicYear: e.target.value })}
                   placeholder="e.g., 2024/2025"
+                  className="border-2 border-black focus:ring-2 focus:ring-black"
                 />
               </div>
             </div>
+          </div>
 
-            {/* Privacy Notice */}
-            <Alert>
-              <AlertDescription>
-                <strong>Privacy:</strong> Your profile information is encrypted and stored securely. 
-                It is used only for personalizing your assignments and is never shared with third parties.
-              </AlertDescription>
-            </Alert>
+          {/* Privacy Notice */}
+          <div className="bg-gray-100 border-2 border-gray-300 p-4 mb-6">
+            <p className="text-sm text-gray-600">
+              <strong>🔒 Privacy Notice:</strong> Your profile information is encrypted and stored securely. 
+              It is used only for personalizing your assignments and is never shared with third parties.
+            </p>
+          </div>
 
-            {/* Error/Success Messages */}
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {success && (
-              <Alert className="border-green-200 bg-green-50">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800">
-                  Profile saved successfully! Redirecting...
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Actions */}
-            <div className="flex justify-end gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onNavigate('dashboard')}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save Profile'
-                )}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          {/* Actions */}
+          <div className="flex justify-end gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onNavigate('dashboard')}
+              disabled={saving}
+              className="border-2 border-black hover:bg-gray-100"
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={saving}
+              className="bg-black text-white hover:bg-gray-800 px-8"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Profile
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -7,13 +7,16 @@ import { AuthRequest } from '../middlewares/auth';
 import { generateAssignmentSchema } from '../utils/validation';
 import {
   generateAssignment,
+  createAssignment,
+  saveStudentInputs,
+  hasCompletedInputs,
   getAssignment,
   getUserAssignments,
 } from '../services/assignment.service';
 import { startGeneration } from '../services/generation.service';
 import { generateDocx } from '../services/docx.service';
 import { prisma } from '../lib/prisma';
-import { APIError, GeneratedContent } from '../types';
+import { APIError, GeneratedContent, StudentInputData } from '../types';
 
 export const generate = async (
   req: AuthRequest,
@@ -333,6 +336,220 @@ export const deleteAssignment = async (
       message: 'Assignment deleted successfully',
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Create assignment (DRAFT status)
+ * Returns assignment with required inputs schema
+ */
+export const create = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      } as APIError);
+      return;
+    }
+
+    const { briefId, grade, language, includeImages, includeTables } =
+      generateAssignmentSchema.parse(req.body);
+
+    // Create assignment (DRAFT status) - does NOT start generation
+    const assignment = await createAssignment(
+      req.user.userId,
+      briefId,
+      grade,
+      language,
+      includeImages || false,
+      includeTables || false
+    );
+
+    // Check if inputs are required
+    const requiredInputs = assignment.snapshot.requiredInputs as any[];
+    const needsInputs = requiredInputs && requiredInputs.length > 0;
+
+    res.status(201).json({
+      id: assignment.id,
+      status: assignment.status,
+      needsInputs,
+      requiredInputs: requiredInputs || [],
+      message: needsInputs
+        ? 'Assignment created. Please complete the required inputs before generating.'
+        : 'Assignment created. Ready to generate.',
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes('profile required')) {
+        res.status(403).json({
+          error: 'Forbidden',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+      if (error.message.includes('not allowed')) {
+        res.status(403).json({
+          error: 'Forbidden',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+      if (error.message === 'Brief not found') {
+        res.status(404).json({
+          error: 'Not Found',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+    }
+    next(error);
+  }
+};
+
+/**
+ * Save student inputs for an assignment
+ */
+export const updateInputs = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      } as APIError);
+      return;
+    }
+
+    const { id } = req.params;
+    const inputs = req.body.inputs as StudentInputData;
+
+    if (!inputs || typeof inputs !== 'object') {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Invalid inputs format. Expected object with field values.',
+      } as APIError);
+      return;
+    }
+
+    const assignment = await saveStudentInputs(id, req.user.userId, inputs);
+
+    res.status(200).json({
+      id: assignment.id,
+      status: assignment.status,
+      studentInputsCompletedAt: assignment.studentInputsCompletedAt,
+      message: 'Inputs saved successfully. Ready to generate.',
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Assignment not found') {
+        res.status(404).json({
+          error: 'Not Found',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+      if (error.message === 'Unauthorized access to assignment') {
+        res.status(403).json({
+          error: 'Forbidden',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+      if (error.message.includes('Cannot modify')) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+      if (error.message.includes('Invalid inputs')) {
+        res.status(400).json({
+          error: 'Validation Error',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+    }
+    next(error);
+  }
+};
+
+/**
+ * Start generation for an assignment (checks inputs are complete)
+ */
+export const startGen = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      } as APIError);
+      return;
+    }
+
+    const { id } = req.params;
+    
+    // Get assignment
+    const assignment = await getAssignment(id, req.user.userId);
+
+    if (assignment.status !== 'DRAFT') {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Assignment is already generating or completed',
+      } as APIError);
+      return;
+    }
+
+    // Check if inputs are complete
+    if (!hasCompletedInputs(assignment)) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Please complete all required inputs before generating',
+        requiredInputs: assignment.snapshot.requiredInputs,
+      } as APIError);
+      return;
+    }
+
+    // Start generation in background
+    startGeneration(assignment.id, req.user.userId).catch((error) => {
+      console.error('[GENERATE] Background generation failed:', error);
+    });
+
+    res.status(200).json({
+      id: assignment.id,
+      status: 'GENERATING',
+      message: 'Generation started. Poll /api/generation/status/:id for progress.',
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Assignment not found') {
+        res.status(404).json({
+          error: 'Not Found',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+      if (error.message === 'Unauthorized access to assignment') {
+        res.status(403).json({
+          error: 'Forbidden',
+          message: error.message,
+        } as APIError);
+        return;
+      }
+    }
     next(error);
   }
 };

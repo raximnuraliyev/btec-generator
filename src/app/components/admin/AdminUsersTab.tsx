@@ -13,14 +13,21 @@ interface User {
   email: string;
   name: string | null;
   role: string;
-  tokens: number;
-  plan: string | null;
   status: string;
+  totalTokensUsedAllTime: number;
+  totalAssignmentsGenerated: number;
+  lastGenerationAt: string | null;
   createdAt: string;
-  lastLoginAt: string | null;
-  _count?: {
-    assignments: number;
-  };
+  studentProfile?: {
+    id: string;
+    fullName: string | null;
+    universityName: string | null;
+  } | null;
+  tokenPlan?: {
+    id: string;
+    planType: string;
+    tokensRemaining: number;
+  } | null;
 }
 
 interface Filters {
@@ -334,16 +341,16 @@ export function AdminUsersTab() {
                       </select>
                     </td>
                     <td className="p-4">
-                      <span className="text-sm">{user.plan || 'FREE'}</span>
+                      <span className="text-sm">{user.tokenPlan?.planType || 'FREE'}</span>
                     </td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Coins className="w-4 h-4 text-yellow-500" />
-                        <span className="font-mono font-bold">{user.tokens}</span>
+                        <span className="font-mono font-bold">{user.tokenPlan?.tokensRemaining || 0}</span>
                       </div>
                     </td>
                     <td className="p-4 text-center">
-                      <span className="font-mono">{user._count?.assignments || 0}</span>
+                      <span className="font-mono">{user.totalAssignmentsGenerated || 0}</span>
                     </td>
                     <td className="p-4">
                       <StatusBadge status={user.status} />
@@ -536,7 +543,7 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
       <div className="bg-white border-2 border-black p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h3 className="font-bold text-xl">{user.name || 'No name'}</h3>
+            <h3 className="font-bold text-xl">{user.name || user.studentProfile?.fullName || 'No name'}</h3>
             <p className="text-gray-500">{user.email}</p>
           </div>
           <button onClick={onClose} className="text-2xl hover:text-gray-500">&times;</button>
@@ -549,22 +556,26 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
           </div>
           <div className="bg-gray-50 p-4 rounded">
             <p className="text-sm text-gray-500">Plan</p>
-            <p className="font-bold">{user.plan || 'FREE'}</p>
+            <p className="font-bold">{user.tokenPlan?.planType || 'FREE'}</p>
           </div>
           <div className="bg-gray-50 p-4 rounded">
-            <p className="text-sm text-gray-500">Tokens</p>
-            <p className="font-bold">{user.tokens}</p>
+            <p className="text-sm text-gray-500">Tokens Remaining</p>
+            <p className="font-bold">{user.tokenPlan?.tokensRemaining ?? 0}</p>
           </div>
           <div className="bg-gray-50 p-4 rounded">
-            <p className="text-sm text-gray-500">Assignments</p>
-            <p className="font-bold">{user._count?.assignments || 0}</p>
+            <p className="text-sm text-gray-500">Assignments Generated</p>
+            <p className="font-bold">{user.totalAssignmentsGenerated}</p>
           </div>
         </div>
 
         <div className="space-y-2 text-sm">
           <p><span className="text-gray-500">Status:</span> <StatusBadge status={user.status} /></p>
           <p><span className="text-gray-500">Created:</span> {new Date(user.createdAt).toLocaleString()}</p>
-          <p><span className="text-gray-500">Last Login:</span> {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}</p>
+          <p><span className="text-gray-500">Last Generation:</span> {user.lastGenerationAt ? new Date(user.lastGenerationAt).toLocaleString() : 'Never'}</p>
+          <p><span className="text-gray-500">Total Tokens Used:</span> {user.totalTokensUsedAllTime}</p>
+          {user.studentProfile && (
+            <p><span className="text-gray-500">University:</span> {user.studentProfile.universityName || 'Not set'}</p>
+          )}
         </div>
 
         <div className="mt-6 pt-4 border-t">

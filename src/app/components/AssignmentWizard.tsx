@@ -109,26 +109,41 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
       setLoading(true);
       setError('');
 
-      const response = await assignmentsApi.generate(
-        {
-          briefId: selectedBrief,
-          grade: selectedGrade as 'PASS' | 'MERIT' | 'DISTINCTION',
-          language: selectedLanguage as 'en' | 'ru' | 'uz' | 'es',
-          includeImages,
-          includeTables,
-        },
-        {
-          'X-Disclaimer-Accepted': 'true',
-        }
-      );
+      // Check if the selected brief has required inputs
+      const selectedBriefObj = briefs.find(b => b.id === selectedBrief);
+      
+      // First, create the assignment (this will be in DRAFT status)
+      const createResponse = await assignmentsApi.createFromBrief({
+        briefId: selectedBrief,
+        targetGrade: selectedGrade as 'PASS' | 'MERIT' | 'DISTINCTION',
+        language: selectedLanguage,
+      });
 
       // Refresh assignments to include the newly created one
       await fetchAssignments();
 
-      // Navigate to monitor page with assignment ID
-      onNavigate('monitor', response.id);
+      // Check if the brief has required inputs by checking the response
+      // If briefSnapshot has requiredInputs, navigate to student inputs page
+      const assignment = createResponse.assignment as any;
+      const hasRequiredInputs = assignment?.briefSnapshot?.requiredInputs?.length > 0;
+
+      if (hasRequiredInputs) {
+        // Navigate to student inputs page
+        onNavigate('student-inputs', createResponse.assignment.id);
+      } else {
+        // No inputs required - start generation directly via the legacy flow
+        // But since we already created the assignment, use startGeneration
+        try {
+          await assignmentsApi.startGeneration(createResponse.assignment.id);
+          onNavigate('monitor', createResponse.assignment.id);
+        } catch (genErr: any) {
+          // If startGeneration fails, fall back to monitor (assignment already exists)
+          console.error('Start generation failed:', genErr);
+          onNavigate('monitor', createResponse.assignment.id);
+        }
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to generate assignment');
+      setError(err.message || 'Failed to create assignment');
     } finally {
       setLoading(false);
     }

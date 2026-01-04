@@ -88,6 +88,7 @@ export async function startGeneration(assignmentId: string, userId: string) {
     console.log(`[ORCHESTRATOR] ========================================`);
 
     // Build brief snapshot for AI with properly structured criteria
+    // AND include student context for personalised first-person writing
     const briefSnapshot = {
       unitName: assignment.snapshot.unitName,
       unitCode: assignment.snapshot.unitCode,
@@ -106,6 +107,11 @@ export async function startGeneration(assignmentId: string, userId: string) {
       options: {
         includeTables: assignment.includeTables,
         includeImages: assignment.includeImages,
+      },
+      // STUDENT CONTEXT - For first-person personalised writing
+      studentContext: {
+        profileSnapshot: assignment.studentProfileSnapshot as any || null,
+        studentInputs: assignment.studentInputs as any || null,
       },
     };
 
@@ -791,7 +797,7 @@ export async function getGenerationStatus(assignmentId: string, userId: string) 
       totalBlocks,
       currentBlock: assignment.contentBlocks[assignment.contentBlocks.length - 1]?.sectionId,
     },
-    currentWordCount: assignment.content?.length || 0,
+    currentWordCount: typeof assignment.content === 'string' ? assignment.content.length : 0,
     targetWordCount: 3000,
     totalTokensUsed: assignment.totalTokensUsed,
     totalAiCalls: assignment.totalAiCalls,

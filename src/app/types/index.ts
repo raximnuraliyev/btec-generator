@@ -102,6 +102,14 @@ export interface Assignment {
   job?: GenerationJob;
   guidance?: WritingGuidanceData; // Writing guidance from backend
   content?: any; // Generated content
+  // New fields for student input system
+  studentInputs?: StudentInputData;
+  studentInputsCompletedAt?: Date | null;
+  studentProfileSnapshot?: StudentProfileSnapshot;
+  briefSnapshot?: {
+    requiredInputs?: InputFieldDefinition[];
+    [key: string]: any;
+  };
 }
 
 export interface CreateAssignmentData {
@@ -133,6 +141,108 @@ export interface ParsedBrief {
     meritCriteria: number;
     distinctionCriteria: number;
   };
+}
+
+// ============================================================================
+// STUDENT INPUT REQUIREMENTS
+// ============================================================================
+
+/**
+ * Types of input fields that teachers can define for briefs
+ */
+export type InputFieldType = 'text' | 'textarea' | 'select' | 'multiselect' | 'number' | 'boolean' | 'array';
+
+/**
+ * Definition of a single input field that students must complete
+ */
+export interface InputFieldDefinition {
+  id: string;                    // Unique identifier (e.g., 'projectTitle', 'toolsUsed')
+  label: string;                 // Display label (e.g., 'Project Title')
+  type: InputFieldType;          // Field type
+  required: boolean;             // Whether field is mandatory
+  options?: string[];            // For select/multiselect types
+  placeholder?: string;          // Placeholder text
+  description?: string;          // Help text explaining what to enter
+  category?: string;             // Grouping category (e.g., 'Project Details', 'Technical')
+  minLength?: number;            // Minimum text length
+  maxLength?: number;            // Maximum text length
+}
+
+/**
+ * Brief with required inputs schema
+ */
+export interface Brief {
+  id: string;
+  title: string;
+  unitCode: string;
+  unitName: string;
+  subjectName: string;
+  level: BTECLevel;
+  scenario: string;
+  language: string;
+  requiredInputs?: InputFieldDefinition[];
+  createdAt: string;
+  updatedAt: string;
+  createdById: string;
+  isActive: boolean;
+  assignmentCount?: number;
+}
+
+/**
+ * Pre-built input templates for common unit types
+ */
+export const INPUT_TEMPLATES: Record<string, InputFieldDefinition[]> = {
+  programming: [
+    { id: 'projectTitle', label: 'Project Title', type: 'text', required: true, placeholder: 'e.g., Inventory Management System' },
+    { id: 'projectDescription', label: 'Project Description', type: 'textarea', required: true, placeholder: 'Describe what your project does...', minLength: 100 },
+    { id: 'programmingLanguages', label: 'Programming Languages Used', type: 'multiselect', required: true, options: ['Python', 'Java', 'JavaScript', 'C#', 'C++', 'PHP', 'Other'] },
+    { id: 'toolsUsed', label: 'Tools & Technologies', type: 'array', required: true, placeholder: 'e.g., VS Code, Git, MySQL' },
+    { id: 'featuresImplemented', label: 'Features Implemented', type: 'array', required: true, placeholder: 'e.g., User authentication, Data validation' },
+    { id: 'challengesFaced', label: 'Challenges Faced', type: 'textarea', required: false, placeholder: 'Describe any difficulties you encountered...' },
+    { id: 'lessonsLearned', label: 'What You Learned', type: 'textarea', required: false, placeholder: 'What did you learn from this project?' },
+  ],
+  bigData: [
+    { id: 'projectTitle', label: 'Project Title', type: 'text', required: true },
+    { id: 'projectDescription', label: 'Project Description', type: 'textarea', required: true, minLength: 100 },
+    { id: 'dataSources', label: 'Data Sources Used', type: 'array', required: true, placeholder: 'e.g., Kaggle dataset, Company database' },
+    { id: 'dataSize', label: 'Approximate Data Size', type: 'text', required: true, placeholder: 'e.g., 100,000 records, 5GB' },
+    { id: 'toolsUsed', label: 'Analytics Tools Used', type: 'multiselect', required: true, options: ['Python/Pandas', 'R', 'SQL', 'Tableau', 'Power BI', 'Excel', 'Other'] },
+    { id: 'analysisPerformed', label: 'Analysis Performed', type: 'array', required: true, placeholder: 'e.g., Trend analysis, Correlation study' },
+    { id: 'keyFindings', label: 'Key Findings', type: 'textarea', required: true, placeholder: 'Summarize your main findings...' },
+  ],
+  business: [
+    { id: 'projectTitle', label: 'Project/Case Study Title', type: 'text', required: true },
+    { id: 'projectDescription', label: 'Project Description', type: 'textarea', required: true, minLength: 100 },
+    { id: 'businessContext', label: 'Business Context', type: 'textarea', required: true, placeholder: 'Describe the business situation or problem...' },
+    { id: 'methodsUsed', label: 'Methods/Frameworks Applied', type: 'array', required: true, placeholder: 'e.g., SWOT, PESTLE, Porter\'s Five Forces' },
+    { id: 'stakeholders', label: 'Key Stakeholders', type: 'array', required: false, placeholder: 'e.g., Management, Customers, Suppliers' },
+    { id: 'recommendations', label: 'Your Recommendations', type: 'textarea', required: true, placeholder: 'What solutions did you propose?' },
+  ],
+  generic: [
+    { id: 'projectTitle', label: 'Project/Assignment Title', type: 'text', required: true },
+    { id: 'projectDescription', label: 'Description of Your Work', type: 'textarea', required: true, minLength: 50, placeholder: 'Describe what you did for this assignment...' },
+    { id: 'methodsUsed', label: 'Methods/Approaches Used', type: 'array', required: false, placeholder: 'e.g., Research, Design, Analysis' },
+    { id: 'keyOutcomes', label: 'Key Outcomes', type: 'textarea', required: false, placeholder: 'What were the main results or conclusions?' },
+    { id: 'challengesFaced', label: 'Challenges Faced', type: 'textarea', required: false },
+    { id: 'lessonsLearned', label: 'Lessons Learned', type: 'textarea', required: false },
+  ],
+};
+
+/**
+ * Student's actual input data (dynamic key-value pairs)
+ */
+export type StudentInputData = Record<string, string | string[] | number | boolean>;
+
+/**
+ * Snapshot of student profile at assignment creation time
+ */
+export interface StudentProfileSnapshot {
+  fullName: string;
+  universityName: string;
+  faculty: string;
+  groupName: string;
+  city: string;
+  academicYear?: string;
 }
 
 // ============================================================================

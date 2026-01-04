@@ -25,6 +25,18 @@ interface BriefSnapshot {
     includeTables: boolean;
     includeImages: boolean;
   };
+  // Student context for personalised first-person writing
+  studentContext?: {
+    profileSnapshot?: {
+      fullName: string;
+      universityName: string;
+      faculty: string;
+      groupName: string;
+      city: string;
+      academicYear?: string;
+    };
+    studentInputs?: Record<string, any>;
+  };
 }
 
 interface GenerationPlan {
@@ -46,12 +58,43 @@ interface WritingTask {
   previousContentSummary: string;
 }
 
+// Student context shape is defined inline in BriefSnapshot.studentContext
+// profileSnapshot: { fullName, universityName, faculty, groupName, city, academicYear }
+// studentInputs: Record<string, any> - dynamic fields based on brief requirements
+
 const WRITER_SYSTEM_PROMPT = `You are BTEC_ASSIGNMENT_WRITER, a controlled academic writing model.
 
 You write ONLY ONE CONTENT BLOCK AT A TIME, strictly bound to a specific criterion or section.
 
+================================================================================
+CRITICAL: FIRST-PERSON ACADEMIC WRITING (MANDATORY)
+================================================================================
+You MUST write in FIRST PERSON from the student's perspective. This is NON-NEGOTIABLE.
+
+✅ ALWAYS USE:
+- "I designed..."
+- "I implemented..."
+- "I analysed..."
+- "In my project, I..."
+- "Through this work, I demonstrated..."
+- "I chose to use..."
+- "My approach was..."
+- "I faced challenges with..."
+- "I learned that..."
+
+❌ NEVER USE:
+- "The student designed..."
+- "One might implement..."
+- "A developer would..."
+- "The system was designed..."
+- "This project demonstrates..."
+- Third-person academic narration
+
+The writing must read as if the STUDENT wrote it themselves, describing THEIR OWN work.
+================================================================================
+
 You MUST NOT:
-- Invent criteria
+- Invent features, tools, or work that the student did NOT provide
 - Skip criteria
 - Repeat content already written
 - Reference criteria not assigned to you
@@ -62,15 +105,27 @@ You MUST NOT:
 - Include headings in body text
 - Mention criterion codes explicitly in the text
 - Pre-empt future criteria content
+- Write in third person or passive voice about the student's work
 
 You MUST:
 - Follow the locked brief snapshot
 - Follow the planner output exactly
+- BASE ALL CONTENT on the student's provided inputs
+- Explain, analyse, justify, and evaluate ONLY what the student declared they did
+- Write in FIRST PERSON as if you are the student
 - Maintain continuity with previously generated blocks
 - Write in the requested language
 - Use formal academic tone
-- Teach and explain clearly (educational purpose)
 - Ensure content is UNIQUE (vary examples, structure, phrasing)
+
+STUDENT INPUT USAGE (CRITICAL):
+When student inputs are provided, you MUST:
+- Reference their actual project/work description
+- Use their declared tools, technologies, and methods
+- Address their stated challenges
+- Evaluate their specific choices and decisions
+- Build tables and examples from their data
+- NEVER invent additional features or work they didn't mention
 
 WRITING RULES:
 - Font: Times New Roman
@@ -84,21 +139,22 @@ WRITING RULES:
 CRITERION-SPECIFIC DEPTH RULES (CRITICAL):
 
 PASS CRITERIA (P1, P2, etc.):
-- EXPLAIN concepts clearly
-- DEMONSTRATE understanding
-- USE examples from the scenario
+- EXPLAIN concepts clearly using the student's work as examples
+- DEMONSTRATE how the student's project addresses the criterion
+- Connect theory to the student's implementation
 - 200-350 words per criterion
 
 MERIT CRITERIA (M1, M2, etc.):
-- ANALYSE different approaches
-- COMPARE alternatives
-- JUSTIFY decisions with reasoning
+- ANALYSE the student's design decisions
+- COMPARE their choices with alternatives they could have made
+- JUSTIFY why the student's approach was appropriate
 - 300-450 words per criterion
 
 DISTINCTION CRITERIA (D1, D2, etc.):
-- EVALUATE strengths and limitations
-- CRITICALLY ASSESS implications
-- LINK theory to real-world impact
+- EVALUATE strengths and limitations of the student's work
+- CRITICALLY ASSESS the implications of their choices
+- Discuss how the student could improve their work
+- LINK the student's project to real-world impact
 - 400-550 words per criterion
 
 OUTPUT RULES (STRICT):
@@ -118,10 +174,80 @@ If the task attempts to regenerate content already written, output:
 ERROR: DUPLICATE_GENERATION
 
 FINAL COMMAND:
-Write ONLY the content for the current task.
+Write ONLY the content for the current task in FIRST PERSON.
 Do NOT explain what you are doing.
 Do NOT mention criteria codes explicitly in the text.
-Do NOT exceed the academic scope of the criterion.`;
+Do NOT exceed the academic scope of the criterion.
+Do NOT invent work the student did not declare.`;
+
+/**
+ * Build student context prompt section from student inputs and profile
+ * This provides AI with the student's actual work details for first-person writing
+ */
+function buildStudentContextPrompt(studentContext?: {
+  profileSnapshot?: {
+    fullName: string;
+    universityName: string;
+    faculty: string;
+    groupName: string;
+    city: string;
+    academicYear?: string;
+  };
+  studentInputs?: Record<string, any>;
+}): string {
+  if (!studentContext) {
+    return '';
+  }
+
+  const parts: string[] = [];
+
+  // Add student profile information
+  if (studentContext.profileSnapshot) {
+    const p = studentContext.profileSnapshot;
+    parts.push(`
+================================================================================
+STUDENT PROFILE (Use for personalisation)
+================================================================================
+Student Name: ${p.fullName}
+University: ${p.universityName}
+Faculty/Department: ${p.faculty}
+Group: ${p.groupName}
+Location: ${p.city}${p.academicYear ? `\nAcademic Year: ${p.academicYear}` : ''}`);
+  }
+
+  // Add student inputs
+  if (studentContext.studentInputs && Object.keys(studentContext.studentInputs).length > 0) {
+    parts.push(`
+================================================================================
+STUDENT'S PROJECT/WORK DETAILS (CRITICAL - Base ALL content on this)
+================================================================================
+The student has declared the following about their work. You MUST use this
+information to write about THEIR project. Do NOT invent additional details.`);
+
+    for (const [key, value] of Object.entries(studentContext.studentInputs)) {
+      const formattedKey = key
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, str => str.toUpperCase())
+        .trim();
+      
+      if (Array.isArray(value)) {
+        parts.push(`\n${formattedKey}:\n${value.map(v => `  - ${v}`).join('\n')}`);
+      } else if (typeof value === 'boolean') {
+        parts.push(`\n${formattedKey}: ${value ? 'Yes' : 'No'}`);
+      } else {
+        parts.push(`\n${formattedKey}: ${value}`);
+      }
+    }
+    
+    parts.push(`
+================================================================================
+IMPORTANT: Write about the student's ACTUAL work described above.
+Use "I designed...", "I implemented...", "In my project..." etc.
+================================================================================`);
+  }
+
+  return parts.join('\n');
+}
 
 export async function generateContentBlock(
   briefSnapshot: BriefSnapshot,
@@ -147,10 +273,13 @@ export async function generateContentBlock(
     depthInstructions = 'EVALUATE strengths and limitations. CRITICALLY ASSESS implications. 400-550 words.';
   }
 
+  // Build student context section if available
+  const studentContextSection = buildStudentContextPrompt(briefSnapshot.studentContext);
+
   const userPrompt = `UNIT: ${briefSnapshot.unitName} (${briefSnapshot.unitCode})
 LEVEL: ${briefSnapshot.level}
 VOCATIONAL SCENARIO: ${briefSnapshot.scenario}
-
+${studentContextSection}
 CURRENT TASK:
 Section: ${task.sectionId}
 Criterion: ${task.criterionCode || 'General content'}
@@ -166,15 +295,17 @@ LANGUAGE: ${language}
 ${languageInstructions}
 
 STRICT INSTRUCTIONS:
+- Write in FIRST PERSON as the student ("I designed...", "I implemented...")
 - Write ONLY content for criterion ${task.criterionCode || 'this section'}
+- Use the student's provided project details and inputs as the basis for examples
 - Follow the depth requirement exactly
 - NO bullet points, NO headings, NO markdown
 - Maintain continuity with previous content
-- Apply concepts to the vocational scenario
+- Do NOT invent features or work the student did not declare
 - Do NOT mention criterion codes in the text
 - UNIQUE VARIATION: This content must be unique. Vary your wording, examples, and explanations from any previous generations. (Session: ${assignmentId.slice(-8)}, Block: ${blockOrder})
 
-Write the content now. Output ONLY the academic text.`;
+Write the content now. Output ONLY the academic text in FIRST PERSON.`;
 
   console.log(`[WRITER] Generating block ${blockOrder} for assignment ${assignmentId}`);
 
@@ -320,6 +451,7 @@ function findCriterion(assessmentCriteria: any, code: string): any {
  * PHASE 2: Generate Introduction
  * 1 AI call, 120-180 words
  * Must: Explain unit topic, Reference scenario, Mention learning aims
+ * NOW: Uses student context for personalised first-person writing
  */
 export async function generateIntroduction(
   briefSnapshot: BriefSnapshot,
@@ -335,7 +467,15 @@ export async function generateIntroduction(
     .map((aim: any) => `- ${aim.code || aim.letter}: ${aim.title || aim.description}`)
     .join('\n');
 
-  const prompt = `Write an INTRODUCTION for a BTEC assignment.
+  // Build student context section
+  const studentContextSection = buildStudentContextPrompt(briefSnapshot.studentContext);
+  
+  // Personalisation details
+  const universityName = briefSnapshot.studentContext?.profileSnapshot?.universityName || '';
+  const projectDescription = briefSnapshot.studentContext?.studentInputs?.projectDescription || 
+                            briefSnapshot.studentContext?.studentInputs?.projectTitle || '';
+
+  const prompt = `Write an INTRODUCTION for a BTEC assignment in FIRST PERSON.
 
 UNIT: ${briefSnapshot.unitName} (${briefSnapshot.unitCode})
 LEVEL: ${briefSnapshot.level}
@@ -343,23 +483,26 @@ VOCATIONAL SCENARIO: ${briefSnapshot.scenario}
 
 LEARNING AIMS:
 ${learningAimsText}
-
+${studentContextSection}
 STRICT REQUIREMENTS:
 - Length: 120-180 words
+- Write in FIRST PERSON ("I designed...", "In this report, I...")
 - Must explain the unit topic
 - Must reference the vocational scenario
 - Must mention learning aims at high level
+${projectDescription ? '- Reference the student\'s actual project/work described above' : ''}
+${universityName ? `- May reference that this is for ${universityName}` : ''}
 - NO criteria codes mentioned
 - NO bullet points
 - NO headings
 - Write in ${language}
 - Formal academic tone
 - First-line indent paragraphs
-- UNIQUE VARIATION: Create a unique introduction with varied wording and structure from any previous generations. (Session: ${assignmentId.slice(-8)})
+- UNIQUE VARIATION: Create a unique introduction with varied wording and structure. (Session: ${assignmentId.slice(-8)})
 
 ${languageInstructions}
 
-Write the introduction now. Output ONLY the introduction text, nothing else.`;
+Write the introduction now in FIRST PERSON. Output ONLY the introduction text, nothing else.`;
 
   console.log('[WRITER] Generating introduction...');
 
@@ -499,6 +642,7 @@ Write the learning aim context now. Output ONLY the context text, nothing else.`
  * PHASE 4: Generate Conclusion
  * 1 AI call, 120-180 words
  * Summarizes achievements, learning aims covered, skills demonstrated
+ * NOW: Uses student context for personalised first-person reflection
  */
 export async function generateConclusion(
   briefSnapshot: BriefSnapshot,
@@ -515,7 +659,13 @@ export async function generateConclusion(
     .map((aim: any) => `- ${aim.code || aim.letter}: ${aim.title || aim.description}`)
     .join('\n');
 
-  const prompt = `Write a CONCLUSION for a BTEC assignment.
+  // Get student context for reflection
+  const studentContext = briefSnapshot.studentContext;
+  const challengesFaced = studentContext?.studentInputs?.challengesFaced || '';
+  const lessonsLearned = studentContext?.studentInputs?.lessonsLearned || '';
+  const limitations = studentContext?.studentInputs?.limitations || '';
+
+  const prompt = `Write a CONCLUSION for a BTEC assignment in FIRST PERSON.
 
 UNIT: ${briefSnapshot.unitName} (${briefSnapshot.unitCode})
 TARGET GRADE: ${briefSnapshot.targetGrade}
@@ -523,26 +673,32 @@ VOCATIONAL SCENARIO: ${briefSnapshot.scenario}
 
 LEARNING AIMS COVERED:
 ${learningAimsText}
+${challengesFaced ? `\nSTUDENT'S CHALLENGES (use for reflection):\n${challengesFaced}` : ''}
+${lessonsLearned ? `\nSTUDENT'S LESSONS LEARNED:\n${lessonsLearned}` : ''}
+${limitations ? `\nSTUDENT'S IDENTIFIED LIMITATIONS:\n${limitations}` : ''}
 
 PREVIOUS CONTENT SUMMARY:
 ${previousSummary}
 
 STRICT REQUIREMENTS:
 - Length: 120-180 words
-- Summarize what was achieved
+- Write in FIRST PERSON ("I achieved...", "Through this project, I learned...")
+- Summarize what YOU (the student) achieved
 - Mention learning aims covered
 - Highlight skills demonstrated
+${challengesFaced ? '- Reflect on challenges faced and how you overcame them' : ''}
+${lessonsLearned ? '- Include genuine reflection on lessons learned' : ''}
 - NO new information
 - NO bullet points
 - NO headings
 - Write in ${language}
 - Formal academic tone
-- Reflective but not personal
+- Personal and reflective
 - UNIQUE VARIATION: Create a unique conclusion with varied wording and reflection. (Session: ${assignmentId.slice(-8)})
 
 ${languageInstructions}
 
-Write the conclusion now. Output ONLY the conclusion text, nothing else.`;
+Write the conclusion now in FIRST PERSON. Output ONLY the conclusion text, nothing else.`;
 
   console.log('[WRITER] Generating conclusion...');
 
@@ -698,6 +854,7 @@ Generate the references now. Output ONLY the JSON array, nothing else.`;
  * Generate content for a LEARNING_AIM item
  * Short explanation of what this aim covers (80-120 words)
  * NO grading language, NO criterion content
+ * NOW: Written in first-person linking to student's project
  */
 export async function generateLearningAimBlock(
   briefSnapshot: BriefSnapshot,
@@ -711,7 +868,10 @@ export async function generateLearningAimBlock(
   const language = (briefSnapshot.language || 'en') as Language;
   const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
 
-  const prompt = `Write a LEARNING AIM INTRODUCTION for a BTEC assignment.
+  // Get student context for personalisation
+  const studentContextPrompt = buildStudentContextPrompt(briefSnapshot.studentContext);
+
+  const prompt = `Write a LEARNING AIM INTRODUCTION for a BTEC assignment in FIRST PERSON.
 
 You are writing ONLY for:
 Learning Aim: ${aimCode}
@@ -720,15 +880,17 @@ Title: ${aimTitle}
 UNIT: ${briefSnapshot.unitName} (${briefSnapshot.unitCode})
 LEVEL: ${briefSnapshot.level}
 VOCATIONAL SCENARIO: ${briefSnapshot.scenario}
+${studentContextPrompt}
 
 PREVIOUS CONTENT SUMMARY:
 ${previousSummary || 'This follows the introduction.'}
 
 STRICT REQUIREMENTS:
 - Length: 80-120 words ONLY
+- Write in FIRST PERSON ("In this section, I will...", "For this learning aim, I explored...")
 - Explain what this learning aim is about
-- Link to the vocational scenario
-- Set up what will be covered
+- Link to how YOUR project relates to this aim
+- Set up what YOU will cover based on YOUR work
 - NO grading language (no "Pass", "Merit", "Distinction")
 - NO criterion content yet (just context)
 - NO bullet points, NO headings, NO markdown
@@ -738,7 +900,7 @@ STRICT REQUIREMENTS:
 
 ${languageInstructions}
 
-Write the learning aim introduction now. Output ONLY the text, nothing else.`;
+Write the learning aim introduction now in FIRST PERSON. Output ONLY the text, nothing else.`;
 
   console.log(`[WRITER] Generating Learning Aim ${aimCode} introduction...`);
 
@@ -787,6 +949,7 @@ Write the learning aim introduction now. Output ONLY the text, nothing else.`;
 /**
  * Generate content for a CRITERION item
  * This is the ATOMIC unit - one criterion = one content block
+ * NOW: Written in first-person using student's actual project details
  */
 export async function generateCriterionBlock(
   briefSnapshot: BriefSnapshot,
@@ -801,22 +964,25 @@ export async function generateCriterionBlock(
   const language = (briefSnapshot.language || 'en') as Language;
   const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
 
+  // Get student context for personalisation
+  const studentContextPrompt = buildStudentContextPrompt(briefSnapshot.studentContext);
+
   // Determine grade level and depth requirements
   let gradeLevel = 'PASS';
-  let depthInstructions = 'EXPLAIN concepts clearly with examples. 200-350 words.';
+  let depthInstructions = 'EXPLAIN concepts clearly with examples from YOUR work. 200-350 words.';
   let commandVerbs = 'describe, explain, identify, outline';
   
   if (criterionCode.toUpperCase().includes('M')) {
     gradeLevel = 'MERIT';
-    depthInstructions = 'ANALYSE and COMPARE different approaches. JUSTIFY decisions with reasoning. 300-450 words.';
+    depthInstructions = 'ANALYSE and COMPARE different approaches YOU considered. JUSTIFY YOUR decisions with reasoning. 300-450 words.';
     commandVerbs = 'analyse, compare, discuss, examine';
   } else if (criterionCode.toUpperCase().includes('D')) {
     gradeLevel = 'DISTINCTION';
-    depthInstructions = 'EVALUATE strengths and limitations. CRITICALLY ASSESS implications. LINK theory to practice. 400-550 words.';
+    depthInstructions = 'EVALUATE strengths and limitations of YOUR approach. CRITICALLY ASSESS implications of YOUR choices. LINK YOUR practice to theory. 400-550 words.';
     commandVerbs = 'evaluate, critically assess, justify, recommend';
   }
 
-  const prompt = `Write content for a SPECIFIC CRITERION in a BTEC assignment.
+  const prompt = `Write content for a SPECIFIC CRITERION in a BTEC assignment in FIRST PERSON.
 
 You are writing ONLY for:
 Learning Aim: ${aimCode}
@@ -830,14 +996,17 @@ VOCATIONAL SCENARIO: ${briefSnapshot.scenario}
 GRADE LEVEL: ${gradeLevel}
 COMMAND VERBS TO USE: ${commandVerbs}
 DEPTH REQUIREMENT: ${depthInstructions}
+${studentContextPrompt}
 
 PREVIOUS CONTENT SUMMARY:
 ${previousSummary || 'This follows the learning aim introduction.'}
 
 STRICT RULES:
-- Write ONLY content that satisfies THIS criterion
+- Write in FIRST PERSON ("I designed...", "I implemented...", "I analysed...")
+- Write ONLY content that satisfies THIS criterion using YOUR project as evidence
 - Use academic tone appropriate for ${gradeLevel} level
-- Apply concepts to the vocational scenario
+- Apply concepts to YOUR actual work (not hypothetical)
+- Reference specific tools/technologies/decisions YOU made
 - Do NOT mention other criteria
 - Do NOT pre-empt future criteria
 - Do NOT mention criterion codes in the text
@@ -848,7 +1017,7 @@ STRICT RULES:
 
 ${languageInstructions}
 
-Write the criterion content now. Output ONLY the academic text.`;
+Write the criterion content now in FIRST PERSON. Output ONLY the academic text.`;
 
   console.log(`[WRITER] Generating criterion ${criterionCode} content...`);
 
@@ -900,7 +1069,8 @@ Write the criterion content now. Output ONLY the academic text.`;
 
 /**
  * Generate a table for a specific criterion
- * Tables are dynamic - generated from criterion context
+ * Tables are dynamic - generated from student's actual project data
+ * NOW: Uses student inputs to create evidence-based tables
  */
 export async function generateCriterionTable(
   briefSnapshot: BriefSnapshot,
@@ -911,7 +1081,29 @@ export async function generateCriterionTable(
   assignmentId: string,
   _blockOrder: number
 ): Promise<TableData> {
-  const prompt = `Generate a TABLE for a BTEC assignment criterion.
+  // Get student context for table data
+  const studentContext = briefSnapshot.studentContext;
+  const studentInputs = studentContext?.studentInputs || {};
+  
+  // Build student data context for table generation
+  let studentDataContext = '';
+  if (studentInputs.toolsUsed?.length) {
+    studentDataContext += `\nTOOLS/TECHNOLOGIES USED BY STUDENT: ${studentInputs.toolsUsed.join(', ')}`;
+  }
+  if (studentInputs.featuresImplemented?.length) {
+    studentDataContext += `\nFEATURES IMPLEMENTED: ${studentInputs.featuresImplemented.join(', ')}`;
+  }
+  if (studentInputs.dataSources?.length) {
+    studentDataContext += `\nDATA SOURCES USED: ${studentInputs.dataSources.join(', ')}`;
+  }
+  if (studentInputs.testingMethods?.length) {
+    studentDataContext += `\nTESTING METHODS: ${studentInputs.testingMethods.join(', ')}`;
+  }
+  if (studentInputs.projectDescription) {
+    studentDataContext += `\nPROJECT DESCRIPTION: ${studentInputs.projectDescription}`;
+  }
+
+  const prompt = `Generate a TABLE for a BTEC assignment criterion based on the STUDENT'S ACTUAL PROJECT.
 
 CRITERION: ${criterionCode}
 DESCRIPTION: ${criterionDescription}
@@ -919,14 +1111,16 @@ TABLE TYPE: ${tableType}
 
 UNIT: ${briefSnapshot.unitName}
 SCENARIO: ${briefSnapshot.scenario}
+${studentDataContext}
 
 REQUIREMENTS:
 - Create a ${tableType} table relevant to this criterion
 - 3-5 columns maximum
-- 3-5 rows of data
+- 3-5 rows of data based on the student's ACTUAL tools/features/data
 - Headers must be clear and academic
-- Data must be specific to the scenario
-- Different scenario = different data
+- Data must reflect the student's REAL project (not hypothetical)
+- If student provided tools/features/testing methods, use THOSE in the table
+- Tables should serve as evidence of what the STUDENT actually did
 
 Output as JSON:
 {

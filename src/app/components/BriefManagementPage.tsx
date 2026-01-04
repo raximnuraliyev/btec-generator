@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Plus, Edit, Trash2, FileText, Search, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -317,6 +317,11 @@ function BriefEditorDialog({ brief, onClose, onSaved }: BriefEditorDialogProps) 
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{brief ? 'Edit Brief' : 'Create Brief'}</DialogTitle>
+          <DialogDescription>
+            {brief 
+              ? 'Update the brief details below. Changes will be saved when you click Update Brief.'
+              : 'Fill in the details below to create a new brief for students.'}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">

@@ -319,6 +319,36 @@ export const assignmentsApi = {
 
     return response.json();
   },
+
+  /**
+   * Create a new assignment from a brief (NEW FLOW)
+   * This creates an assignment in DRAFT status that requires student inputs before generation
+   */
+  createFromBrief: (data: {
+    briefId: string;
+    targetGrade: 'PASS' | 'MERIT' | 'DISTINCTION';
+    language?: string;
+  }) =>
+    api.post<{ assignment: AssignmentResponse }>('/assignments', data),
+
+  /**
+   * Save student inputs for an assignment
+   * Student must provide their project details before generation can start
+   */
+  saveStudentInputs: (assignmentId: string, studentInputs: Record<string, unknown>) =>
+    api.put<{ assignment: AssignmentResponse; complete: boolean }>(`/assignments/${assignmentId}/inputs`, { studentInputs }),
+
+  /**
+   * Start generation after student inputs are complete
+   */
+  startGeneration: (assignmentId: string) =>
+    api.post<{ assignment: AssignmentResponse; jobId: string }>(`/assignments/${assignmentId}/generate`, {}),
+
+  /**
+   * Check if student has completed required inputs
+   */
+  hasCompletedInputs: (assignmentId: string) =>
+    api.get<{ complete: boolean; missingFields?: string[] }>(`/assignments/${assignmentId}/inputs/status`),
 };
 
 // =============================================================================

@@ -160,16 +160,18 @@ export const getAllUsers = async (page = 1, limit = 50, filters?: {
       select: {
         id: true,
         email: true,
+        name: true,
         role: true,
+        status: true,
         totalTokensUsedAllTime: true,
         totalAssignmentsGenerated: true,
         lastGenerationAt: true,
         createdAt: true,
         studentProfile: {
-          select: { fullName: true, universityName: true },
+          select: { id: true, fullName: true, universityName: true },
         },
         tokenPlan: {
-          select: { planType: true, tokensRemaining: true },
+          select: { id: true, planType: true, tokensRemaining: true },
         },
       },
       orderBy: { createdAt: 'desc' },

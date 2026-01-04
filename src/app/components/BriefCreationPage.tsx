@@ -7,11 +7,14 @@ import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { 
   Plus, Trash2, Save, ArrowLeft, CheckCircle2, AlertCircle, 
-  FileText, GraduationCap, Target, ClipboardCheck 
+  FileText, GraduationCap, Target, ClipboardCheck, Users
 } from 'lucide-react';
 import { briefsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import type { InputFieldDefinition } from '../types';
+import { INPUT_TEMPLATES } from '../types';
+import { InputFieldEditor } from './InputFieldEditor';
 
 interface TaskBlock {
   title: string;
@@ -41,6 +44,8 @@ interface BriefFormData {
   assessmentCriteria: AssessmentCriteria;
   checklistOfEvidence: string[];
   sourcesOfInformation: string[];
+  requiredInputs: InputFieldDefinition[];
+  inputTemplate: string;
 }
 
 interface BriefCreationPageProps {
@@ -94,7 +99,18 @@ export function BriefCreationPage({ onNavigate, editBriefId }: BriefCreationPage
     },
     checklistOfEvidence: [''],
     sourcesOfInformation: [''],
+    requiredInputs: [],
+    inputTemplate: 'none',
   });
+
+  // Handle input template selection
+  const handleInputTemplateChange = (template: string) => {
+    setFormData(prev => ({
+      ...prev,
+      inputTemplate: template,
+      requiredInputs: template === 'none' ? [] : (INPUT_TEMPLATES[template] || []),
+    }));
+  };
 
   // Validation function
   const validateBrief = (): string[] => {
@@ -148,6 +164,7 @@ export function BriefCreationPage({ onNavigate, editBriefId }: BriefCreationPage
         },
         checklistOfEvidence: formData.checklistOfEvidence.filter(e => e.trim()),
         sourcesOfInformation: formData.sourcesOfInformation.filter(s => s.trim()),
+        requiredInputs: formData.requiredInputs,
         status: 'DRAFT',
       };
 
@@ -202,6 +219,7 @@ export function BriefCreationPage({ onNavigate, editBriefId }: BriefCreationPage
         },
         checklistOfEvidence: formData.checklistOfEvidence.filter(e => e.trim()),
         sourcesOfInformation: formData.sourcesOfInformation.filter(s => s.trim()),
+        requiredInputs: formData.requiredInputs,
         status: 'PUBLISHED',
       };
 
@@ -723,6 +741,96 @@ export function BriefCreationPage({ onNavigate, editBriefId }: BriefCreationPage
                 <Plus className="h-4 w-4 mr-2" />
                 Add Source
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* 8. Student Input Requirements */}
+          <Card className="border-blue-500/30 bg-blue-50/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-500" />
+                Student Input Requirements
+              </CardTitle>
+              <CardDescription>
+                Define what information students must provide about their project before AI generation.
+                This enables personalised, first-person academic writing based on their actual work.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Template Quick Start */}
+              <div className="p-4 bg-gray-50 rounded-lg border">
+                <Label>Quick Start with Template</Label>
+                <p className="text-sm text-gray-500 mb-2">
+                  Start with a pre-built template, then customize as needed
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={formData.inputTemplate === 'none' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleInputTemplateChange('none')}
+                  >
+                    No Inputs
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.inputTemplate === 'programming' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleInputTemplateChange('programming')}
+                  >
+                    Programming
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.inputTemplate === 'bigData' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleInputTemplateChange('bigData')}
+                  >
+                    Big Data
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.inputTemplate === 'business' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleInputTemplateChange('business')}
+                  >
+                    Business
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.inputTemplate === 'generic' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleInputTemplateChange('generic')}
+                  >
+                    Generic
+                  </Button>
+                </div>
+              </div>
+
+              {/* Dynamic Field Editor */}
+              <div className="mt-4">
+                <Label className="text-base font-medium mb-3 block">
+                  Custom Input Fields
+                </Label>
+                <InputFieldEditor
+                  fields={formData.requiredInputs}
+                  onChange={(newFields) => {
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      requiredInputs: newFields,
+                      inputTemplate: 'custom' // Mark as custom when edited
+                    }));
+                  }}
+                />
+              </div>
+
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  When students start a generation, they'll be asked to fill in these details about their actual project.
+                  The AI will then write in first person ("I designed...", "I implemented...") based on what they provide.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
 

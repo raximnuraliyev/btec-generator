@@ -7,7 +7,7 @@ import { HowToUsePage } from './components/HowToUsePage';
 import { AssignmentSetup } from './components/AssignmentSetup';
 import AssignmentWizard from './components/AssignmentWizard';
 import StudentProfilePage from './components/StudentProfilePage';
-import { MonitorPage } from './components/MonitorPage';
+import { MonitorPage } from './components/MonitorPageNew';
 import { ReviewPage } from './components/ReviewPage';
 import { AdminPage } from './components/AdminPage';
 import { IssuePage } from './components/IssuePage';
@@ -18,6 +18,7 @@ import { BriefManagementPage } from './components/BriefManagementPage';
 import { BriefCreationPage } from './components/BriefCreationPage';
 import { AssignmentPreviewPage } from './components/AssignmentPreviewPage';
 import { TeacherDashboardPage } from './components/TeacherDashboardPage';
+import { StudentInputPage } from './components/StudentInputPage';
 import { Toaster } from 'sonner';
 
 /**
@@ -30,7 +31,7 @@ import { Toaster } from 'sonner';
  * Made by Ajax Manson
  */
 
-type Page = 'login' | 'dashboard' | 'how-to-use' | 'create' | 'profile' | 'monitor' | 'review' | 'admin' | 'issues' | 'support' | 'tokens' | 'briefs' | 'create-brief' | 'preview' | 'teacher';
+type Page = 'login' | 'dashboard' | 'how-to-use' | 'create' | 'profile' | 'monitor' | 'review' | 'admin' | 'issues' | 'support' | 'tokens' | 'briefs' | 'create-brief' | 'preview' | 'teacher' | 'student-inputs';
 
 export default function App() {
   return (
@@ -105,7 +106,13 @@ function Router() {
         navigate('dashboard');
         return null;
       }
-      return <MonitorPage assignmentId={currentAssignmentId} onNavigate={navigate} />;
+      return (
+        <MonitorPage 
+          assignmentId={currentAssignmentId} 
+          onBack={() => navigate('dashboard')}
+          onComplete={() => navigate('review', currentAssignmentId)}
+        />
+      );
 
     case 'review':
       if (!currentAssignmentId) {
@@ -141,6 +148,13 @@ function Router() {
 
     case 'teacher':
       return <TeacherDashboardPage onNavigate={navigate} />;
+
+    case 'student-inputs':
+      if (!currentAssignmentId) {
+        navigate('dashboard');
+        return null;
+      }
+      return <StudentInputPage assignmentId={currentAssignmentId} onNavigate={navigate} />;
 
     default:
       return <DashboardPage onNavigate={navigate} />;

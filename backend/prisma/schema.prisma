@@ -160,6 +160,11 @@ model Brief {
   // Assessment criteria - { pass: [{code, description}], merit: [...], distinction: [...] }
   assessmentCriteria    Json
   
+  // STUDENT INPUT REQUIREMENTS (Teacher-defined schema)
+  // Defines what information students must provide before generation
+  // Array of input field definitions: { id, label, type, required, options?, placeholder? }
+  requiredInputs        Json?       // Array of InputFieldDefinition objects
+  
   // Additional requirements
   checklistOfEvidence   String[]
   sourcesOfInformation  String[]
@@ -206,6 +211,9 @@ model ResolvedBriefSnapshot {
   checklistOfEvidence   String[]
   sourcesOfInformation  String[]
   
+  // Required student inputs schema (copied from brief)
+  requiredInputs        Json?
+  
   // Generation settings captured at snapshot time
   language              Language
   includeImages         Boolean  @default(false)
@@ -236,6 +244,15 @@ model Assignment {
   language               Language
   includeImages          Boolean          @default(false)
   includeTables          Boolean          @default(false)
+  
+  // STUDENT INPUTS (CRITICAL - Immutable after generation starts)
+  // Contains the actual student-provided data matching the brief's requiredInputs schema
+  studentInputs          Json?            // StudentInputData object
+  studentInputsCompletedAt DateTime?      // When student finished filling inputs
+  
+  // STUDENT PROFILE SNAPSHOT (Immutable at generation time)
+  // Copied from user's StudentProfile for personalisation
+  studentProfileSnapshot Json?            // { fullName, universityName, faculty, groupName, city }
   
   // Status tracking
   status                 AssignmentStatus @default(DRAFT)
