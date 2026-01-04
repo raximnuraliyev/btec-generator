@@ -21,9 +21,12 @@ export interface TableData {
 
 export interface ImagePlaceholder {
   description: string;
+  figureNumber?: number;
+  caption?: string;
 }
 
 export interface Reference {
+  id?: number;
   text: string;
   order: number;
 }
@@ -31,6 +34,7 @@ export interface Reference {
 export interface CriterionBlock {
   code: string;
   content: string;
+  description?: string;
 }
 
 export interface ContentSection {
@@ -41,11 +45,43 @@ export interface ContentSection {
   images?: ImagePlaceholder[];
 }
 
+/**
+ * NEW ATOMIC CONTENT STRUCTURE
+ * Each item in the outline becomes a separate content block
+ */
+export type ContentBlockType = 
+  | 'INTRODUCTION'
+  | 'LEARNING_AIM'
+  | 'CRITERION'
+  | 'CONCLUSION'
+  | 'REFERENCES';
+
+export interface AtomicContentBlock {
+  type: ContentBlockType;
+  // For INTRODUCTION, CONCLUSION
+  title?: string;
+  content?: string;
+  // For LEARNING_AIM
+  aimCode?: string;
+  aimTitle?: string;
+  aimContent?: string;
+  // For CRITERION
+  criterionCode?: string;
+  criterionTitle?: string;
+  criterionContent?: string;
+  table?: TableData;
+  image?: ImagePlaceholder;
+  // For REFERENCES
+  references?: Reference[];
+}
+
 export interface GeneratedContent {
   introduction: string;
   sections: ContentSection[];
   conclusion: string;
   references: Reference[];
+  // New atomic structure (preferred)
+  atomicBlocks?: AtomicContentBlock[];
 }
 
 export interface JWTPayload {

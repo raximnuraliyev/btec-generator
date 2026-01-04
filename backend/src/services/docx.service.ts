@@ -12,7 +12,7 @@ import {
   TableOfContents,
   BorderStyle,
 } from 'docx';
-import { GeneratedContent, TableData } from '../types';
+import { GeneratedContent, TableData, AtomicContentBlock } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -31,6 +31,10 @@ if (!fs.existsSync(EXPORT_DIR)) {
  * - First line indent: 0.5 inch (720 twips)
  * - Line spacing: 1.5 (360)
  * - Language: User-selected
+ * 
+ * HEADING STRUCTURE:
+ * - Heading 1: Introduction, Learning Aims, Conclusion, References (centered)
+ * - Heading 2: Criteria codes (e.g., A.P1, A.M1, B.D1) (left-aligned)
  */
 
 const FONT_SIZE = 28; // 14pt in half-points
@@ -49,10 +53,321 @@ export const generateDocx = async (
     hasIntroduction: !!content?.introduction,
     sectionsCount: content?.sections?.length || 0,
     hasConclusion: !!content?.conclusion,
-    referencesCount: content?.references?.length || 0
+    referencesCount: content?.references?.length || 0,
+    hasAtomicBlocks: !!(content?.atomicBlocks && content.atomicBlocks.length > 0)
   });
   
-  if (!content || !content.sections || content.sections.length === 0) {
+  if (!content) {
+    throw new Error('Invalid content structure: content is null');
+  }
+
+  // Use atomic blocks if available, otherwise fall back to legacy structure
+  if (content.atomicBlocks && content.atomicBlocks.length > 0) {
+    console.log('[DOCX] Using ATOMIC block structure');
+    return generateDocxFromAtomicBlocks(assignmentId, content.atomicBlocks, unitName, unitCode);
+  }
+  
+  console.log('[DOCX] Using LEGACY section structure');
+  return generateDocxFromLegacyStructure(assignmentId, content, unitName, unitCode);
+};
+
+/**
+ * NEW ATOMIC DOCX GENERATION
+ * Each atomic block = ONE heading + ONE content block
+ * This ensures proper structure: Introduction → Learning Aims → Criteria → Conclusion → References
+ */
+async function generateDocxFromAtomicBlocks(
+  assignmentId: string,
+  atomicBlocks: AtomicContentBlock[],
+  unitName: string,
+  unitCode: string
+): Promise<string> {
+  const sections: any[] = [];
+  let sectionNumber = 0;
+  let tableCounter = 1;
+  let figureCounter = 1;
+  let currentAimNumber = 0;
+
+  // COVER PAGE - Title (Centered, Bold, Heading 1)
+  sections.push(
+    new Paragraph({
+      text: `${unitName} (${unitCode})`,
+      heading: HeadingLevel.HEADING_1,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 400 },
+      style: 'Heading1'
+    })
+  );
+
+  // TABLE OF CONTENTS
+  sections.push(
+    new Paragraph({
+      text: 'Table of Contents',
+      heading: HeadingLevel.HEADING_1,
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 400, after: 200 },
+    })
+  );
+  
+  sections.push(
+    new TableOfContents('Table of Contents', {
+      hyperlink: true,
+      headingStyleRange: '1-2',
+    })
+  );
+
+  // Process each atomic block
+  for (const block of atomicBlocks) {
+    switch (block.type) {
+      case 'INTRODUCTION': {
+        sectionNumber++;
+        // Introduction heading (Heading 1, centered)
+        sections.push(
+          new Paragraph({
+            text: `${sectionNumber}. Introduction`,
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 400, after: 200 },
+          })
+        );
+
+        // Introduction content
+        if (block.content) {
+          const paragraphs = block.content.split('\n\n').filter(p => p.trim());
+          for (const paragraph of paragraphs) {
+            sections.push(createContentParagraph(paragraph));
+          }
+        }
+        break;
+      }
+
+      case 'LEARNING_AIM': {
+        sectionNumber++;
+        currentAimNumber++;
+        const aimCode = block.aimCode || String.fromCharCode(64 + currentAimNumber);
+        
+        // Learning Aim heading (Heading 1, centered)
+        // Format: "2. Learning Aim A: [Title]" or "AIM A: [Title]"
+        const aimTitle = block.aimTitle || `Learning Aim ${aimCode}`;
+        sections.push(
+          new Paragraph({
+            text: `${sectionNumber}. ${aimTitle}`,
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 400, after: 200 },
+          })
+        );
+
+        // Learning aim introduction content (80-120 words)
+        if (block.aimContent) {
+          const paragraphs = block.aimContent.split('\n\n').filter(p => p.trim());
+          for (const paragraph of paragraphs) {
+            sections.push(createContentParagraph(paragraph));
+          }
+        }
+        break;
+      }
+
+      case 'CRITERION': {
+        const criterionCode = block.criterionCode || 'A.P1';
+        const criterionTitle = block.criterionTitle || criterionCode;
+        
+        // Criterion heading (Heading 2, left-aligned)
+        // Format: "2.1 A.P1 Describe the key components..."
+        sections.push(
+          new Paragraph({
+            text: criterionTitle,
+            heading: HeadingLevel.HEADING_2,
+            alignment: AlignmentType.LEFT,
+            spacing: { before: 300, after: 200 },
+          })
+        );
+
+        // Criterion content
+        if (block.criterionContent) {
+          const paragraphs = block.criterionContent.split('\n\n').filter(p => p.trim());
+          for (const paragraph of paragraphs) {
+            sections.push(createContentParagraph(paragraph));
+          }
+        }
+
+        // Table for this criterion (if present)
+        if (block.table) {
+          sections.push(createFormattedTable(block.table));
+          sections.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: block.table.caption || `Table ${tableCounter}. Data table`,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            })
+          );
+          tableCounter++;
+        }
+
+        // Image placeholder for this criterion (if present)
+        if (block.image) {
+          sections.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `[IMAGE PLACEHOLDER]`,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 200, after: 100 },
+              border: {
+                top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              },
+            })
+          );
+          
+          sections.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: block.image.caption || `Figure ${figureCounter}. ${block.image.description || 'Diagram'}`,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                  italics: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            })
+          );
+          figureCounter++;
+        }
+        break;
+      }
+
+      case 'CONCLUSION': {
+        sectionNumber++;
+        // Conclusion heading (Heading 1, centered)
+        sections.push(
+          new Paragraph({
+            text: `${sectionNumber}. Conclusion`,
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 400, after: 200 },
+          })
+        );
+
+        // Conclusion content
+        if (block.content) {
+          const paragraphs = block.content.split('\n\n').filter(p => p.trim());
+          for (const paragraph of paragraphs) {
+            sections.push(createContentParagraph(paragraph));
+          }
+        }
+        break;
+      }
+
+      case 'REFERENCES': {
+        sectionNumber++;
+        // References heading (Heading 1, centered)
+        sections.push(
+          new Paragraph({
+            text: `${sectionNumber}. References`,
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 400, after: 200 },
+          })
+        );
+
+        // References as numbered list
+        if (block.references && block.references.length > 0) {
+          // Sort by id/order
+          const sortedRefs = [...block.references].sort((a, b) => 
+            (a.id || a.order || 0) - (b.id || b.order || 0)
+          );
+          
+          for (const ref of sortedRefs) {
+            const refNumber = ref.id || ref.order || 1;
+            sections.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `${refNumber}. ${ref.text}`,
+                    font: FONT_NAME,
+                    size: FONT_SIZE,
+                  }),
+                ],
+                alignment: AlignmentType.LEFT,
+                indent: { left: 360, hanging: 360 }, // Hanging indent for references
+                spacing: { line: LINE_SPACING, after: 120 },
+              })
+            );
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  // Create document
+  const doc = new Document({
+    sections: [
+      {
+        properties: {},
+        children: sections,
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  const filename = `assignment_${assignmentId}_${Date.now()}.docx`;
+  const filepath = path.join(EXPORT_DIR, filename);
+
+  console.log('[DOCX] Writing atomic file to:', filepath);
+  fs.writeFileSync(filepath, buffer);
+  console.log('[DOCX] Atomic file written successfully, size:', buffer.length, 'bytes');
+
+  return filepath;
+}
+
+/**
+ * Create a content paragraph with proper formatting
+ */
+function createContentParagraph(text: string): Paragraph {
+  return new Paragraph({
+    children: [
+      new TextRun({
+        text: text.trim(),
+        font: FONT_NAME,
+        size: FONT_SIZE,
+      }),
+    ],
+    alignment: AlignmentType.JUSTIFIED,
+    indent: { firstLine: FIRST_LINE_INDENT },
+    spacing: { line: LINE_SPACING },
+  });
+}
+
+/**
+ * LEGACY DOCX GENERATION (backward compatibility)
+ */
+async function generateDocxFromLegacyStructure(
+  assignmentId: string,
+  content: GeneratedContent,
+  unitName: string,
+  unitCode: string
+): Promise<string> {
+  if (!content.sections || content.sections.length === 0) {
     throw new Error('Invalid content structure: missing sections');
   }
   

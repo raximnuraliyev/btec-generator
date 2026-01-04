@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { prisma } from '../lib/prisma';
 import { logAIUsage } from './admin.service';
 import { LANGUAGE_CONFIGS } from '../utils/language';
-import { Reference } from '../types';
+import { Reference, TableData } from '../types';
 
 const openrouter = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
@@ -27,12 +27,15 @@ interface BriefSnapshot {
 }
 
 interface GenerationPlan {
-  introduction: any;
-  sections: any[];
-  tables: any[];
-  images: any[];
-  conclusion: any;
-  references: any;
+  documentOutline?: any[];
+  tablesRequired?: any[];
+  imagesSuggested?: any[];
+  introduction?: any;
+  sections?: any[];
+  tables?: any[];
+  images?: any[];
+  conclusion?: any;
+  references?: any;
 }
 
 interface WritingTask {
@@ -56,6 +59,8 @@ You MUST NOT:
 - Use bullet points or numbered lists
 - Use markdown formatting
 - Include headings in body text
+- Mention criterion codes explicitly in the text
+- Pre-empt future criteria content
 
 You MUST:
 - Follow the locked brief snapshot
@@ -64,6 +69,7 @@ You MUST:
 - Write in the requested language
 - Use formal academic tone
 - Teach and explain clearly (educational purpose)
+- Ensure content is UNIQUE (vary examples, structure, phrasing)
 
 WRITING RULES:
 - Font: Times New Roman
@@ -252,7 +258,7 @@ export async function generateAllBlocks(
   }
 
   // Sections (ordered by generationOrder)
-  const sortedSections = [...generationPlan.sections].sort(
+  const sortedSections = [...(generationPlan.sections || [])].sort(
     (a, b) => a.generationOrder - b.generationOrder
   );
 
@@ -678,5 +684,409 @@ Generate the references now. Output ONLY the JSON array, nothing else.`;
   });
 
   console.log(`[WRITER] Generated ${references.length} references`);
+  return references;
+}
+
+/**
+ * NEW ATOMIC WRITING FUNCTIONS
+ * Each function writes exactly ONE content block for ONE outline item
+ */
+
+/**
+ * Generate content for a LEARNING_AIM item
+ * Short explanation of what this aim covers (80-120 words)
+ * NO grading language, NO criterion content
+ */
+export async function generateLearningAimBlock(
+  briefSnapshot: BriefSnapshot,
+  aimCode: string,
+  aimTitle: string,
+  previousSummary: string,
+  userId: string,
+  assignmentId: string,
+  blockOrder: number
+): Promise<string> {
+  const language = briefSnapshot.language || 'en';
+  const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
+
+  const prompt = `Write a LEARNING AIM INTRODUCTION for a BTEC assignment.
+
+You are writing ONLY for:
+Learning Aim: ${aimCode}
+Title: ${aimTitle}
+
+UNIT: ${briefSnapshot.unitName} (${briefSnapshot.unitCode})
+LEVEL: ${briefSnapshot.level}
+VOCATIONAL SCENARIO: ${briefSnapshot.scenario}
+
+PREVIOUS CONTENT SUMMARY:
+${previousSummary || 'This follows the introduction.'}
+
+STRICT REQUIREMENTS:
+- Length: 80-120 words ONLY
+- Explain what this learning aim is about
+- Link to the vocational scenario
+- Set up what will be covered
+- NO grading language (no "Pass", "Merit", "Distinction")
+- NO criterion content yet (just context)
+- NO bullet points, NO headings, NO markdown
+- Write in ${language}
+- Formal academic tone
+- UNIQUE VARIATION: Vary wording and structure. (Session: ${assignmentId.slice(-8)}, Block: ${blockOrder})
+
+${languageInstructions}
+
+Write the learning aim introduction now. Output ONLY the text, nothing else.`;
+
+  console.log(`[WRITER] Generating Learning Aim ${aimCode} introduction...`);
+
+  const uniqueSeed = parseInt(assignmentId.slice(-8), 16) + blockOrder;
+
+  const completion = await openrouter.chat.completions.create({
+    model: WRITER_MODEL,
+    messages: [
+      { role: 'system', content: WRITER_SYSTEM_PROMPT },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.85,
+    max_tokens: 400,
+    seed: uniqueSeed,
+  });
+
+  const content = completion.choices[0].message.content || '';
+
+  await logAIUsage({
+    assignmentId,
+    userId,
+    userRole: 'USER',
+    aiProvider: 'openrouter',
+    aiModel: WRITER_MODEL,
+    promptTokens: completion.usage?.prompt_tokens || 0,
+    completionTokens: completion.usage?.completion_tokens || 0,
+    totalTokens: completion.usage?.total_tokens || 0,
+    purpose: 'LEARNING_AIM',
+  });
+
+  await prisma.contentBlock.create({
+    data: {
+      assignmentId,
+      sectionId: `aim_${aimCode}`,
+      criterionCode: null,
+      blockOrder,
+      content,
+      tokensUsed: completion.usage?.total_tokens || 0,
+    },
+  });
+
+  console.log(`[WRITER] Learning Aim ${aimCode} introduction generated`);
+  return content;
+}
+
+/**
+ * Generate content for a CRITERION item
+ * This is the ATOMIC unit - one criterion = one content block
+ */
+export async function generateCriterionBlock(
+  briefSnapshot: BriefSnapshot,
+  aimCode: string,
+  criterionCode: string,
+  criterionDescription: string,
+  previousSummary: string,
+  userId: string,
+  assignmentId: string,
+  blockOrder: number
+): Promise<string> {
+  const language = briefSnapshot.language || 'en';
+  const languageInstructions = LANGUAGE_CONFIGS[language]?.academicInstructions || '';
+
+  // Determine grade level and depth requirements
+  let gradeLevel = 'PASS';
+  let depthInstructions = 'EXPLAIN concepts clearly with examples. 200-350 words.';
+  let commandVerbs = 'describe, explain, identify, outline';
+  
+  if (criterionCode.toUpperCase().includes('M')) {
+    gradeLevel = 'MERIT';
+    depthInstructions = 'ANALYSE and COMPARE different approaches. JUSTIFY decisions with reasoning. 300-450 words.';
+    commandVerbs = 'analyse, compare, discuss, examine';
+  } else if (criterionCode.toUpperCase().includes('D')) {
+    gradeLevel = 'DISTINCTION';
+    depthInstructions = 'EVALUATE strengths and limitations. CRITICALLY ASSESS implications. LINK theory to practice. 400-550 words.';
+    commandVerbs = 'evaluate, critically assess, justify, recommend';
+  }
+
+  const prompt = `Write content for a SPECIFIC CRITERION in a BTEC assignment.
+
+You are writing ONLY for:
+Learning Aim: ${aimCode}
+Criterion: ${criterionCode}
+Criterion Description: ${criterionDescription}
+
+UNIT: ${briefSnapshot.unitName} (${briefSnapshot.unitCode})
+LEVEL: ${briefSnapshot.level}
+VOCATIONAL SCENARIO: ${briefSnapshot.scenario}
+
+GRADE LEVEL: ${gradeLevel}
+COMMAND VERBS TO USE: ${commandVerbs}
+DEPTH REQUIREMENT: ${depthInstructions}
+
+PREVIOUS CONTENT SUMMARY:
+${previousSummary || 'This follows the learning aim introduction.'}
+
+STRICT RULES:
+- Write ONLY content that satisfies THIS criterion
+- Use academic tone appropriate for ${gradeLevel} level
+- Apply concepts to the vocational scenario
+- Do NOT mention other criteria
+- Do NOT pre-empt future criteria
+- Do NOT mention criterion codes in the text
+- NO bullet points, NO headings, NO markdown
+- Write in ${language}
+- Ensure originality (vary examples, structure, phrasing)
+- UNIQUE VARIATION: Session ${assignmentId.slice(-8)}, Block ${blockOrder}
+
+${languageInstructions}
+
+Write the criterion content now. Output ONLY the academic text.`;
+
+  console.log(`[WRITER] Generating criterion ${criterionCode} content...`);
+
+  const uniqueSeed = parseInt(assignmentId.slice(-8), 16) + blockOrder;
+
+  const completion = await openrouter.chat.completions.create({
+    model: WRITER_MODEL,
+    messages: [
+      { role: 'system', content: WRITER_SYSTEM_PROMPT },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.85,
+    max_tokens: 1500,
+    seed: uniqueSeed,
+  });
+
+  const content = completion.choices[0].message.content || '';
+
+  if (content.startsWith('ERROR:')) {
+    throw new Error(content);
+  }
+
+  await logAIUsage({
+    assignmentId,
+    userId,
+    userRole: 'USER',
+    aiProvider: 'openrouter',
+    aiModel: WRITER_MODEL,
+    promptTokens: completion.usage?.prompt_tokens || 0,
+    completionTokens: completion.usage?.completion_tokens || 0,
+    totalTokens: completion.usage?.total_tokens || 0,
+    purpose: 'CRITERION',
+  });
+
+  await prisma.contentBlock.create({
+    data: {
+      assignmentId,
+      sectionId: `criterion_${criterionCode}`,
+      criterionCode,
+      blockOrder,
+      content,
+      tokensUsed: completion.usage?.total_tokens || 0,
+    },
+  });
+
+  console.log(`[WRITER] Criterion ${criterionCode} content generated`);
+  return content;
+}
+
+/**
+ * Generate a table for a specific criterion
+ * Tables are dynamic - generated from criterion context
+ */
+export async function generateCriterionTable(
+  briefSnapshot: BriefSnapshot,
+  criterionCode: string,
+  criterionDescription: string,
+  tableType: string,
+  userId: string,
+  assignmentId: string,
+  blockOrder: number
+): Promise<TableData> {
+  const prompt = `Generate a TABLE for a BTEC assignment criterion.
+
+CRITERION: ${criterionCode}
+DESCRIPTION: ${criterionDescription}
+TABLE TYPE: ${tableType}
+
+UNIT: ${briefSnapshot.unitName}
+SCENARIO: ${briefSnapshot.scenario}
+
+REQUIREMENTS:
+- Create a ${tableType} table relevant to this criterion
+- 3-5 columns maximum
+- 3-5 rows of data
+- Headers must be clear and academic
+- Data must be specific to the scenario
+- Different scenario = different data
+
+Output as JSON:
+{
+  "caption": "Table title describing what this table shows",
+  "headers": ["Column1", "Column2", "Column3"],
+  "rows": [
+    ["Data 1.1", "Data 1.2", "Data 1.3"],
+    ["Data 2.1", "Data 2.2", "Data 2.3"],
+    ["Data 3.1", "Data 3.2", "Data 3.3"]
+  ]
+}
+
+Generate the table now. Output ONLY the JSON, nothing else.`;
+
+  console.log(`[WRITER] Generating table for criterion ${criterionCode}...`);
+
+  const completion = await openrouter.chat.completions.create({
+    model: WRITER_MODEL,
+    messages: [
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.7,
+    max_tokens: 800,
+    response_format: { type: 'json_object' },
+  });
+
+  let table: TableData;
+  const responseContent = completion.choices[0].message.content || '{}';
+
+  try {
+    const parsed = JSON.parse(responseContent);
+    table = {
+      caption: parsed.caption || `${tableType} for ${criterionCode}`,
+      headers: parsed.headers || ['Aspect', 'Description', 'Application'],
+      rows: parsed.rows || [['Item 1', 'Description', 'Application']],
+    };
+  } catch (e) {
+    console.error('[WRITER] Failed to parse table JSON, using default');
+    table = {
+      caption: `${tableType} for ${criterionCode}`,
+      headers: ['Aspect', 'Description', 'Application'],
+      rows: [
+        ['Key Concept 1', 'Definition of this concept', 'How it applies to the scenario'],
+        ['Key Concept 2', 'Definition of this concept', 'How it applies to the scenario'],
+        ['Key Concept 3', 'Definition of this concept', 'How it applies to the scenario'],
+      ],
+    };
+  }
+
+  await logAIUsage({
+    assignmentId,
+    userId,
+    userRole: 'USER',
+    aiProvider: 'openrouter',
+    aiModel: WRITER_MODEL,
+    promptTokens: completion.usage?.prompt_tokens || 0,
+    completionTokens: completion.usage?.completion_tokens || 0,
+    totalTokens: completion.usage?.total_tokens || 0,
+    purpose: 'TABLE',
+  });
+
+  console.log(`[WRITER] Table generated for criterion ${criterionCode}`);
+  return table;
+}
+
+/**
+ * Generate structured references (array of objects)
+ * Each reference is numbered and formatted in Oxford style
+ */
+export async function generateStructuredReferences(
+  briefSnapshot: BriefSnapshot,
+  targetGrade: 'PASS' | 'MERIT' | 'DISTINCTION',
+  userId: string,
+  assignmentId: string,
+  blockOrder: number
+): Promise<Reference[]> {
+  // Determine reference count based on grade
+  const refCount = targetGrade === 'PASS' ? 3 : targetGrade === 'MERIT' ? 5 : 8;
+
+  const prompt = `Generate ${refCount} academic REFERENCES for a BTEC assignment.
+
+UNIT: ${briefSnapshot.unitName}
+TOPIC: ${briefSnapshot.scenario}
+LEVEL: ${briefSnapshot.level}
+
+REQUIREMENTS:
+- Exactly ${refCount} references
+- Oxford referencing style
+- Mix of: textbooks, academic journals, reputable websites
+- Relevant to the unit topic
+- Each reference must be UNIQUE and realistic
+- Different every time (vary authors, years, titles)
+
+Output as JSON:
+{
+  "references": [
+    { "id": 1, "text": "Author, A. (Year) Title. Publisher." },
+    { "id": 2, "text": "Author, B. (Year) 'Article Title', Journal Name, Volume(Issue), pp. X-Y." }
+  ]
+}
+
+Generate the references now. Output ONLY the JSON.`;
+
+  console.log('[WRITER] Generating structured references...');
+
+  const uniqueSeed = parseInt(assignmentId.slice(-8), 16) + blockOrder;
+
+  const completion = await openrouter.chat.completions.create({
+    model: WRITER_MODEL,
+    messages: [
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.8,
+    max_tokens: 1200,
+    response_format: { type: 'json_object' },
+    seed: uniqueSeed,
+  });
+
+  let references: Reference[] = [];
+  const responseContent = completion.choices[0].message.content || '{}';
+
+  try {
+    const parsed = JSON.parse(responseContent);
+    const refArray = Array.isArray(parsed) ? parsed : (parsed.references || []);
+    
+    references = refArray.map((ref: any, idx: number) => ({
+      id: ref.id || idx + 1,
+      text: ref.text || ref.reference || String(ref),
+      order: ref.order || ref.id || idx + 1,
+    }));
+  } catch (e) {
+    console.error('[WRITER] Failed to parse references JSON, creating defaults');
+    references = [
+      { id: 1, text: 'BTEC National IT Student Book. Pearson Education.', order: 1 },
+      { id: 2, text: 'Computing and IT. Cambridge University Press.', order: 2 },
+      { id: 3, text: 'BBC Bitesize (2024) Computing Resources. Available at: https://www.bbc.co.uk/bitesize', order: 3 },
+    ];
+  }
+
+  await logAIUsage({
+    assignmentId,
+    userId,
+    userRole: 'USER',
+    aiProvider: 'openrouter',
+    aiModel: WRITER_MODEL,
+    promptTokens: completion.usage?.prompt_tokens || 0,
+    completionTokens: completion.usage?.completion_tokens || 0,
+    totalTokens: completion.usage?.total_tokens || 0,
+    purpose: 'REFERENCES',
+  });
+
+  await prisma.contentBlock.create({
+    data: {
+      assignmentId,
+      sectionId: 'references',
+      criterionCode: null,
+      blockOrder,
+      content: JSON.stringify(references),
+      tokensUsed: completion.usage?.total_tokens || 0,
+    },
+  });
+
+  console.log(`[WRITER] Generated ${references.length} structured references`);
   return references;
 }

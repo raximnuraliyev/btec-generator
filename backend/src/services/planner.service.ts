@@ -30,125 +30,160 @@ interface BriefSnapshot {
   };
 }
 
-interface GenerationPlan {
-  introduction: {
-    covers: string[];
-    notes: string;
-  };
-  sections: Array<{
-    id: string;
-    title: string;
-    learningAim: string;
-    coversCriteria: string[];
-    generationOrder: number;
-  }>;
-  tables: Array<{
-    id: string;
-    title: string;
-    relatedTo: string[];
-    placementAfterSectionId: string;
-  }>;
-  images: Array<{
-    id: string;
-    caption: string;
-    relatedTo: string[];
-    placementAfterSectionId: string;
-  }>;
-  conclusion: {
-    covers: string[];
-    generationOrder: number;
-  };
-  references: {
-    requiredCount: number;
-  };
+/**
+ * NEW ATOMIC OUTLINE ITEM TYPES
+ * Each item = ONE heading + ONE content block in DOCX
+ */
+export type OutlineItemType = 
+  | 'INTRODUCTION'
+  | 'LEARNING_AIM'
+  | 'CRITERION'
+  | 'CONCLUSION'
+  | 'REFERENCES';
+
+export interface OutlineItem {
+  type: OutlineItemType;
+  title?: string;           // For INTRODUCTION, CONCLUSION, REFERENCES
+  aimCode?: string;         // For LEARNING_AIM, CRITERION (e.g., "A", "B")
+  aimTitle?: string;        // For LEARNING_AIM (e.g., "Learning Aim A: Understand AI systems")
+  criterionCode?: string;   // For CRITERION (e.g., "A.P1", "A.M1")
+  criterionTitle?: string;  // For CRITERION (e.g., "A.P1 Describe the key components...")
+  criterionDescription?: string; // Full criterion description for AI context
+}
+
+export interface TableRequirement {
+  criterionCode: string;
+  tableType: string;
+}
+
+export interface ImageSuggestion {
+  criterionCode: string;
+  imageType: string;
+}
+
+export interface GenerationPlan {
+  documentOutline: OutlineItem[];
+  tablesRequired: TableRequirement[];
+  imagesSuggested: ImageSuggestion[];
+  // Legacy fields for backward compatibility
+  introduction?: any;
+  sections?: any[];
+  tables?: any[];
+  images?: any[];
+  conclusion?: any;
+  references?: any;
 }
 
 const PLANNER_SYSTEM_PROMPT = `You are BTEC_ASSIGNMENT_PLANNER, a deterministic academic planning model.
 
-Your ONLY responsibility is to analyze a locked assignment brief snapshot and produce a structured generation plan.
+Your ONLY responsibility is to create an ATOMIC DOCUMENT OUTLINE where:
+- EACH criterion = ONE separate item in the outline
+- EACH item becomes ONE heading + ONE content block in the final document
+- NO blob writing (never group criteria under a single learning aim text)
 
 You MUST NOT:
 - Write assignment content
-- Paraphrase criteria
-- Add new criteria
-- Change wording of learning aims
-- Generate prose, explanations, or examples
+- Group multiple criteria together
+- Skip any criteria based on target grade
+- Change wording of criteria
+- Generate prose or examples
 
 You MUST:
+- Output ONE outline item per criterion
+- Include LEARNING_AIM items as section headers BEFORE their criteria
 - Respect the brief snapshot as immutable truth
-- Use ONLY the data provided
+- Use criterion codes EXACTLY as provided (with aim letter prefix, e.g., A.P1, A.M1)
 - Output STRICT JSON in the required schema
-- Be deterministic and reproducible
-- Use criterion codes EXACTLY as provided in the input (e.g., P1, M1, D1)
 
 PLANNING RULES (CRITICAL):
-1. Every criterion MUST be covered exactly once
-2. Only include criteria allowed by targetGrade:
+1. INTRODUCTION first, then LEARNING_AIMS + CRITERIA, then CONCLUSION, then REFERENCES
+2. Each LEARNING_AIM is followed by its CRITERION items
+3. Only include criteria allowed by targetGrade:
    - PASS → only pass criteria (P1, P2, etc.)
-   - MERIT → pass + merit (P1, P2, M1, M2, etc.)
-   - DISTINCTION → pass + merit + distinction (P1, P2, M1, M2, D1, D2, etc.)
-3. Do NOT merge unrelated criteria
-4. Keep academic flow: introduction → learning aims → conclusion
-5. Tables and images must be tied to specific aims or criteria
-6. Create one section per learning aim
-7. Map criteria to their learning aims correctly
+   - MERIT → pass + merit criteria
+   - DISTINCTION → pass + merit + distinction criteria
+4. Each criterion gets its OWN outline item
+5. Map criteria to correct learning aims using the prefix letter
 
-OUTPUT FORMAT (STRICT):
-You MUST output a single JSON object matching this schema exactly:
-
+OUTPUT FORMAT (STRICT - THIS IS THE CONTRACT):
 {
-  "introduction": {
-    "covers": ["unit overview", "scenario context"],
-    "notes": "Purpose of introduction"
-  },
-  "sections": [
+  "documentOutline": [
     {
-      "id": "A",
-      "title": "Learning Aim A – [Title from brief]",
-      "learningAim": "A",
-      "coversCriteria": ["P1", "P2", "M1"],
-      "generationOrder": 1
+      "type": "INTRODUCTION",
+      "title": "Introduction"
     },
     {
-      "id": "B",
-      "title": "Learning Aim B – [Title from brief]",
-      "learningAim": "B",
-      "coversCriteria": ["P3", "M2", "D1"],
-      "generationOrder": 2
-    }
-  ],
-  "tables": [
+      "type": "LEARNING_AIM",
+      "aimCode": "A",
+      "aimTitle": "Learning Aim A: [Title from brief]"
+    },
     {
-      "id": "T1",
-      "title": "Comparison table title",
-      "relatedTo": ["P2"],
-      "placementAfterSectionId": "A"
-    }
-  ],
-  "images": [
+      "type": "CRITERION",
+      "aimCode": "A",
+      "criterionCode": "A.P1",
+      "criterionTitle": "A.P1 [Criterion description]",
+      "criterionDescription": "[Full description from brief]"
+    },
     {
-      "id": "I1",
-      "caption": "Figure description",
-      "relatedTo": ["P1"],
-      "placementAfterSectionId": "A"
+      "type": "CRITERION",
+      "aimCode": "A",
+      "criterionCode": "A.P2",
+      "criterionTitle": "A.P2 [Criterion description]",
+      "criterionDescription": "[Full description from brief]"
+    },
+    {
+      "type": "CRITERION",
+      "aimCode": "A",
+      "criterionCode": "A.M1",
+      "criterionTitle": "A.M1 [Criterion description]",
+      "criterionDescription": "[Full description from brief]"
+    },
+    {
+      "type": "LEARNING_AIM",
+      "aimCode": "B",
+      "aimTitle": "Learning Aim B: [Title from brief]"
+    },
+    {
+      "type": "CRITERION",
+      "aimCode": "B",
+      "criterionCode": "B.P3",
+      "criterionTitle": "B.P3 [Criterion description]",
+      "criterionDescription": "[Full description from brief]"
+    },
+    {
+      "type": "CONCLUSION",
+      "title": "Conclusion"
+    },
+    {
+      "type": "REFERENCES",
+      "title": "References"
     }
   ],
-  "conclusion": {
-    "covers": ["summary", "reflection"],
-    "generationOrder": 999
-  },
-  "references": {
-    "requiredCount": 5
-  }
+  "tablesRequired": [
+    {
+      "criterionCode": "A.M1",
+      "tableType": "Comparison"
+    }
+  ],
+  "imagesSuggested": [
+    {
+      "criterionCode": "A.P2",
+      "imageType": "System Flow Diagram"
+    }
+  ]
 }
+
+TABLE/IMAGE RULES:
+- Tables are best for MERIT criteria (comparison, analysis)
+- Images are best for PASS criteria (explanation diagrams)
+- Link each table/image to a SPECIFIC criterionCode
+- Only suggest if includeTables/includeImages is true
 
 FINAL INSTRUCTIONS:
 - Output JSON ONLY
-- No markdown
-- No comments
-- No explanations
-- No prose
-- No extra fields
+- No markdown, no comments, no explanations
+- Every criterion MUST have its own CRITERION item
+- Use the learning aim letter prefix for all criterion codes
 
 If any required input is missing, output:
 { "error": "INVALID_BRIEF_SNAPSHOT" }`;
@@ -160,7 +195,7 @@ export async function generatePlan(
 ): Promise<GenerationPlan> {
   const userPrompt = JSON.stringify(briefSnapshot, null, 2);
 
-  console.log('[PLANNER] Generating plan for assignment:', assignmentId);
+  console.log('[PLANNER] Generating atomic document outline for assignment:', assignmentId);
 
   const completion = await openrouter.chat.completions.create({
     model: PLANNER_MODEL,
@@ -177,12 +212,27 @@ export async function generatePlan(
     throw new Error('No response from planner model');
   }
 
-  const plan: GenerationPlan = JSON.parse(response);
+  let plan: GenerationPlan = JSON.parse(response);
 
   // Validate plan structure
   if ('error' in plan) {
     throw new Error(`Planner error: ${(plan as any).error}`);
   }
+
+  // If AI returned old format, convert to new atomic format
+  if (!plan.documentOutline && plan.sections) {
+    console.log('[PLANNER] Converting legacy plan format to atomic outline');
+    plan = convertLegacyPlanToAtomic(plan, briefSnapshot);
+  }
+
+  // Validate atomic structure
+  if (!plan.documentOutline || plan.documentOutline.length === 0) {
+    console.log('[PLANNER] Plan missing documentOutline, building from brief');
+    plan = buildAtomicPlanFromBrief(briefSnapshot);
+  }
+
+  console.log('[PLANNER] Document outline items:', plan.documentOutline.length);
+  console.log('[PLANNER] Outline structure:', plan.documentOutline.map(i => `${i.type}:${i.criterionCode || i.aimCode || i.title}`).join(' → '));
 
   // Log AI usage
   await logAIUsage({
@@ -206,6 +256,185 @@ export async function generatePlan(
     },
   });
 
-  console.log('[PLANNER] Plan generated successfully');
+  console.log('[PLANNER] Atomic plan generated successfully');
   return plan;
+}
+
+/**
+ * Convert legacy plan format (sections with coversCriteria) to atomic outline
+ */
+function convertLegacyPlanToAtomic(legacyPlan: any, briefSnapshot: BriefSnapshot): GenerationPlan {
+  const outline: OutlineItem[] = [];
+  
+  // Add introduction
+  outline.push({ type: 'INTRODUCTION', title: 'Introduction' });
+  
+  // Process each section (learning aim)
+  for (const section of (legacyPlan.sections || [])) {
+    const aimLetter = section.learningAim || section.id || 'A';
+    const learningAim = briefSnapshot.learningAims.find(
+      (a: any) => a.code === aimLetter || a.letter === aimLetter
+    );
+    
+    // Add learning aim header
+    outline.push({
+      type: 'LEARNING_AIM',
+      aimCode: aimLetter,
+      aimTitle: `Learning Aim ${aimLetter}: ${learningAim?.title || learningAim?.description || section.title || ''}`
+    });
+    
+    // Add each criterion as separate item
+    for (const criterionCode of (section.coversCriteria || [])) {
+      const criterion = findCriterionInBrief(briefSnapshot.assessmentCriteria, criterionCode);
+      const fullCode = criterionCode.includes('.') ? criterionCode : `${aimLetter}.${criterionCode}`;
+      
+      outline.push({
+        type: 'CRITERION',
+        aimCode: aimLetter,
+        criterionCode: fullCode,
+        criterionTitle: `${fullCode} ${criterion?.description || ''}`.substring(0, 80),
+        criterionDescription: criterion?.description || ''
+      });
+    }
+  }
+  
+  // Add conclusion and references
+  outline.push({ type: 'CONCLUSION', title: 'Conclusion' });
+  outline.push({ type: 'REFERENCES', title: 'References' });
+  
+  // Convert tables
+  const tablesRequired: TableRequirement[] = (legacyPlan.tables || []).map((t: any) => ({
+    criterionCode: t.relatedTo?.[0] || 'A.M1',
+    tableType: t.title || 'Comparison'
+  }));
+  
+  // Convert images
+  const imagesSuggested: ImageSuggestion[] = (legacyPlan.images || []).map((i: any) => ({
+    criterionCode: i.relatedTo?.[0] || 'A.P1',
+    imageType: i.caption || 'Diagram'
+  }));
+  
+  return { documentOutline: outline, tablesRequired, imagesSuggested };
+}
+
+/**
+ * Build atomic plan directly from brief snapshot (fallback)
+ */
+function buildAtomicPlanFromBrief(briefSnapshot: BriefSnapshot): GenerationPlan {
+  const outline: OutlineItem[] = [];
+  const tablesRequired: TableRequirement[] = [];
+  const imagesSuggested: ImageSuggestion[] = [];
+  
+  // Add introduction
+  outline.push({ type: 'INTRODUCTION', title: 'Introduction' });
+  
+  // Determine which criteria to include based on target grade
+  let criteriaToInclude: Array<{ code: string; description: string; grade: string }> = [];
+  
+  for (const c of briefSnapshot.assessmentCriteria.pass) {
+    criteriaToInclude.push({ ...c, grade: 'PASS' });
+  }
+  
+  if (briefSnapshot.targetGrade === 'MERIT' || briefSnapshot.targetGrade === 'DISTINCTION') {
+    for (const c of briefSnapshot.assessmentCriteria.merit) {
+      criteriaToInclude.push({ ...c, grade: 'MERIT' });
+    }
+  }
+  
+  if (briefSnapshot.targetGrade === 'DISTINCTION') {
+    for (const c of briefSnapshot.assessmentCriteria.distinction) {
+      criteriaToInclude.push({ ...c, grade: 'DISTINCTION' });
+    }
+  }
+  
+  // Group criteria by learning aim
+  const criteriaByAim: Record<string, typeof criteriaToInclude> = {};
+  for (const criterion of criteriaToInclude) {
+    // Extract aim letter from criterion code (e.g., "A.P1" → "A", "P1" → "A" default)
+    let aimLetter = 'A';
+    if (criterion.code.includes('.')) {
+      aimLetter = criterion.code.split('.')[0];
+    } else {
+      // Try to match to learning aim based on prefix pattern
+      const match = criterion.code.match(/^([A-Z])?[PMD]\d+$/i);
+      if (match && match[1]) {
+        aimLetter = match[1].toUpperCase();
+      }
+    }
+    
+    if (!criteriaByAim[aimLetter]) {
+      criteriaByAim[aimLetter] = [];
+    }
+    criteriaByAim[aimLetter].push(criterion);
+  }
+  
+  // Generate outline for each learning aim
+  const aimLetters = Object.keys(criteriaByAim).sort();
+  
+  for (const aimLetter of aimLetters) {
+    const learningAim = briefSnapshot.learningAims.find(
+      (a: any) => a.code === aimLetter || a.letter === aimLetter || a.code?.startsWith(aimLetter)
+    );
+    
+    // Add learning aim header
+    outline.push({
+      type: 'LEARNING_AIM',
+      aimCode: aimLetter,
+      aimTitle: `Learning Aim ${aimLetter}: ${learningAim?.title || learningAim?.description || `Section ${aimLetter}`}`
+    });
+    
+    // Add each criterion
+    for (const criterion of criteriaByAim[aimLetter]) {
+      const fullCode = criterion.code.includes('.') ? criterion.code : `${aimLetter}.${criterion.code}`;
+      
+      outline.push({
+        type: 'CRITERION',
+        aimCode: aimLetter,
+        criterionCode: fullCode,
+        criterionTitle: `${fullCode} ${criterion.description}`.substring(0, 80),
+        criterionDescription: criterion.description
+      });
+      
+      // Add table for merit criteria if tables enabled
+      if (criterion.grade === 'MERIT' && briefSnapshot.options.includeTables) {
+        tablesRequired.push({
+          criterionCode: fullCode,
+          tableType: 'Comparison'
+        });
+      }
+      
+      // Add image for pass criteria if images enabled
+      if (criterion.grade === 'PASS' && briefSnapshot.options.includeImages && imagesSuggested.length < 3) {
+        imagesSuggested.push({
+          criterionCode: fullCode,
+          imageType: 'Explanatory Diagram'
+        });
+      }
+    }
+  }
+  
+  // Add conclusion and references
+  outline.push({ type: 'CONCLUSION', title: 'Conclusion' });
+  outline.push({ type: 'REFERENCES', title: 'References' });
+  
+  return { documentOutline: outline, tablesRequired, imagesSuggested };
+}
+
+/**
+ * Find criterion by code across all grade levels
+ */
+function findCriterionInBrief(assessmentCriteria: any, code: string): any {
+  const cleanCode = code.replace(/^[A-Z]\./, ''); // Remove aim prefix if present
+  const allCriteria = [
+    ...(assessmentCriteria.pass || []),
+    ...(assessmentCriteria.merit || []),
+    ...(assessmentCriteria.distinction || []),
+  ];
+
+  return allCriteria.find((c: any) => 
+    c.code === code || 
+    c.code === cleanCode ||
+    c.code?.toUpperCase() === code?.toUpperCase() ||
+    c.code?.toUpperCase() === cleanCode?.toUpperCase()
+  );
 }

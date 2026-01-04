@@ -1,10 +1,20 @@
 import { prisma } from '../lib/prisma';
-import { generatePlan } from './planner.service';
-import { generateContentBlock, generateIntroduction, generateLearningAimContent, generateConclusion, generateReferences } from './writer.service';
+import { generatePlan, GenerationPlan } from './planner.service';
+import { 
+  generateContentBlock, 
+  generateIntroduction, 
+  generateLearningAimContent, 
+  generateConclusion, 
+  generateReferences,
+  generateLearningAimBlock,
+  generateCriterionBlock,
+  generateCriterionTable,
+  generateStructuredReferences
+} from './writer.service';
 import { deductTokens } from './token.service';
 import { generateDocx } from './docx.service';
 import { generateWritingGuidance } from './guidance.service';
-import { GeneratedContent, ContentSection, CriterionBlock } from '../types';
+import { GeneratedContent, ContentSection, CriterionBlock, AtomicContentBlock, Reference, TableData, ImagePlaceholder } from '../types';
 
 /**
  * CANONICAL ASSIGNMENT GENERATION FLOW
@@ -258,10 +268,264 @@ function normalizeCriteria(criteria: any, prefix: string): Array<{ code: string;
 }
 
 /**
- * PHASED CONTENT GENERATION
- * Generates content following strict phase boundaries
+ * PHASED CONTENT GENERATION - ATOMIC APPROACH
+ * Each outline item = ONE heading + ONE content block
+ * No more "Learning Aim blob writing"
  */
 async function generatePhasedContent(
+  briefSnapshot: any,
+  generationPlan: GenerationPlan,
+  userId: string,
+  assignmentId: string
+): Promise<GeneratedContent> {
+  // Check if we have the new atomic outline
+  const hasAtomicOutline = generationPlan.documentOutline && generationPlan.documentOutline.length > 0;
+  
+  if (hasAtomicOutline) {
+    console.log(`[GENERATION] Using ATOMIC outline with ${generationPlan.documentOutline!.length} items`);
+    return generateFromAtomicOutline(briefSnapshot, generationPlan, userId, assignmentId);
+  }
+
+  // Legacy fallback for old plan format
+  console.log(`[GENERATION] Using LEGACY plan format (fallback)`);
+  return generateLegacyPhasedContent(briefSnapshot, generationPlan, userId, assignmentId);
+}
+
+/**
+ * NEW ATOMIC GENERATION FLOW
+ * Process each outline item in sequence, each becomes ONE content block
+ */
+async function generateFromAtomicOutline(
+  briefSnapshot: any,
+  generationPlan: GenerationPlan,
+  userId: string,
+  assignmentId: string
+): Promise<GeneratedContent> {
+  let blockOrder = 0;
+  let previousSummary = '';
+  
+  const atomicBlocks: AtomicContentBlock[] = [];
+  
+  // Build legacy structure for backward compatibility
+  let introductionContent = '';
+  let conclusionContent = '';
+  let references: Reference[] = [];
+  const sections: ContentSection[] = [];
+  
+  // Track current learning aim for grouping
+  let currentAimCode = '';
+  let currentSection: ContentSection | null = null;
+  let tableCounter = 1;
+  let figureCounter = 1;
+
+  for (const item of generationPlan.documentOutline!) {
+    console.log(`[GENERATION] Processing outline item: ${item.type} ${item.criterionCode || item.aimCode || item.title || ''}`);
+
+    switch (item.type) {
+      case 'INTRODUCTION': {
+        console.log(`[GENERATION] PHASE 2: Introduction`);
+        introductionContent = await generateIntroduction(
+          briefSnapshot,
+          generationPlan,
+          userId,
+          assignmentId,
+          blockOrder++
+        );
+        previousSummary = introductionContent.substring(0, 200);
+        
+        atomicBlocks.push({
+          type: 'INTRODUCTION',
+          title: 'Introduction',
+          content: introductionContent
+        });
+        break;
+      }
+
+      case 'LEARNING_AIM': {
+        // Save previous section if exists
+        if (currentSection) {
+          sections.push(currentSection);
+        }
+        
+        currentAimCode = item.aimCode || 'A';
+        console.log(`[GENERATION] PHASE 3: Learning Aim ${currentAimCode}`);
+        
+        const aimContent = await generateLearningAimBlock(
+          briefSnapshot,
+          currentAimCode,
+          item.aimTitle || `Learning Aim ${currentAimCode}`,
+          previousSummary,
+          userId,
+          assignmentId,
+          blockOrder++
+        );
+        previousSummary = aimContent.substring(0, 200);
+        
+        atomicBlocks.push({
+          type: 'LEARNING_AIM',
+          aimCode: currentAimCode,
+          aimTitle: item.aimTitle,
+          aimContent: aimContent
+        });
+        
+        // Start new section for legacy structure
+        currentSection = {
+          heading: item.aimTitle || `Learning Aim ${currentAimCode}`,
+          content: aimContent,
+          criteria: [],
+          tables: [],
+          images: []
+        };
+        break;
+      }
+
+      case 'CRITERION': {
+        const criterionCode = item.criterionCode || 'A.P1';
+        const criterionDescription = item.criterionDescription || item.criterionTitle || '';
+        
+        console.log(`[GENERATION] Generating CRITERION: ${criterionCode}`);
+        
+        const criterionContent = await generateCriterionBlock(
+          briefSnapshot,
+          item.aimCode || currentAimCode,
+          criterionCode,
+          criterionDescription,
+          previousSummary,
+          userId,
+          assignmentId,
+          blockOrder++
+        );
+        previousSummary = criterionContent.substring(0, 200);
+        
+        // Check if this criterion needs a table
+        let table: TableData | undefined;
+        const tableReq = (generationPlan.tablesRequired || []).find(
+          (t: any) => t.criterionCode === criterionCode
+        );
+        if (tableReq && briefSnapshot.options.includeTables) {
+          table = await generateCriterionTable(
+            briefSnapshot,
+            criterionCode,
+            criterionDescription,
+            tableReq.tableType || 'Comparison',
+            userId,
+            assignmentId,
+            blockOrder++
+          );
+          table.caption = `Table ${tableCounter}. ${table.caption}`;
+          tableCounter++;
+        }
+        
+        // Check if this criterion needs an image
+        let image: ImagePlaceholder | undefined;
+        const imageReq = (generationPlan.imagesSuggested || []).find(
+          (i: any) => i.criterionCode === criterionCode
+        );
+        if (imageReq && briefSnapshot.options.includeImages) {
+          image = {
+            description: imageReq.imageType || 'Diagram',
+            figureNumber: figureCounter,
+            caption: `Figure ${figureCounter}. ${imageReq.imageType || 'Illustrative diagram'}`
+          };
+          figureCounter++;
+        }
+        
+        atomicBlocks.push({
+          type: 'CRITERION',
+          aimCode: item.aimCode || currentAimCode,
+          criterionCode,
+          criterionTitle: item.criterionTitle,
+          criterionContent,
+          table,
+          image
+        });
+        
+        // Add to current section for legacy structure
+        if (currentSection) {
+          currentSection.content += `\n\n${criterionContent}`;
+          currentSection.criteria = currentSection.criteria || [];
+          currentSection.criteria.push({
+            code: criterionCode,
+            content: criterionContent,
+            description: criterionDescription
+          });
+          if (table) {
+            currentSection.tables = currentSection.tables || [];
+            currentSection.tables.push(table);
+          }
+          if (image) {
+            currentSection.images = currentSection.images || [];
+            currentSection.images.push(image);
+          }
+        }
+        break;
+      }
+
+      case 'CONCLUSION': {
+        // Save final section
+        if (currentSection) {
+          sections.push(currentSection);
+          currentSection = null;
+        }
+        
+        console.log(`[GENERATION] PHASE 4: Conclusion`);
+        conclusionContent = await generateConclusion(
+          briefSnapshot,
+          generationPlan,
+          previousSummary,
+          userId,
+          assignmentId,
+          blockOrder++
+        );
+        
+        atomicBlocks.push({
+          type: 'CONCLUSION',
+          title: 'Conclusion',
+          content: conclusionContent
+        });
+        break;
+      }
+
+      case 'REFERENCES': {
+        console.log(`[GENERATION] PHASE 5: References`);
+        references = await generateStructuredReferences(
+          briefSnapshot,
+          briefSnapshot.targetGrade,
+          userId,
+          assignmentId,
+          blockOrder++
+        );
+        
+        atomicBlocks.push({
+          type: 'REFERENCES',
+          title: 'References',
+          references
+        });
+        break;
+      }
+    }
+  }
+
+  // Ensure final section is saved
+  if (currentSection) {
+    sections.push(currentSection);
+  }
+
+  console.log(`[GENERATION] Atomic generation complete: ${atomicBlocks.length} blocks, ${sections.length} sections`);
+
+  return {
+    introduction: introductionContent,
+    sections,
+    conclusion: conclusionContent,
+    references,
+    atomicBlocks
+  };
+}
+
+/**
+ * LEGACY PHASED CONTENT GENERATION (backward compatibility)
+ */
+async function generateLegacyPhasedContent(
   briefSnapshot: any,
   generationPlan: any,
   userId: string,
