@@ -1,0 +1,33 @@
+# Node modules
+node_modules
+npm-debug.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist
+build
+
+# Development files
+.git
+.gitignore
+
+# Logs
+logs
+*.log
+
+# Testing
+coverage
+
+# Database
+*.db
+*.sqlite
+
+# Prisma
+migrations/
+
+# Exports
+exports/
