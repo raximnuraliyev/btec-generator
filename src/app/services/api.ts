@@ -6,15 +6,27 @@
  */
 
 // =============================================================================
+// VITE ENV TYPE DECLARATION
+// =============================================================================
+
+interface ImportMetaEnv {
+  readonly VITE_API_URL?: string;
+  readonly DEV?: boolean;
+  // add other env variables here if needed
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
+// =============================================================================
 // CONFIGURATION
 // =============================================================================
 
-// @ts-ignore - import.meta.env is defined by Vite
 const API_BASE_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/api`  // Production: use ngrok URL + /api
   : '/api';  // Development: use Vite proxy
 
-// @ts-ignore - import.meta.env is defined by Vite
 const WS_URL = import.meta.env.DEV ? 'ws://localhost:3000' : window.location.origin.replace(/^http/, 'ws');
 
 // =============================================================================
