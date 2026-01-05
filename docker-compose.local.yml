@@ -1,10 +1,15 @@
-# Docker Compose - Production Configuration
-# BTEC Generator - AI Academic Assignment Generator
+# =====================================================================
+# Docker Compose - Local Backend + Database Configuration
+# =====================================================================
+# This runs ONLY the backend and database locally.
+# Frontend will be deployed to Vercel.
+# Backend will be exposed via ngrok at http://127.0.0.1:4040
 #
 # Usage:
-#   docker-compose up -d          # Start all services
-#   docker-compose down           # Stop all services
-#   docker-compose logs -f        # View logs
+#   docker-compose -f docker-compose.local.yml up -d
+#   docker-compose -f docker-compose.local.yml down
+#   docker-compose -f docker-compose.local.yml logs -f backend
+# =====================================================================
 
 services:
   # =============================================================================
@@ -21,7 +26,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-btec} -d ${POSTGRES_DB:-btec_generator}"]
       interval: 10s
@@ -29,27 +34,6 @@ services:
       retries: 5
     networks:
       - btec-network
-
-
-
-  # =============================================================================
-  # Adminer (Database Admin UI)
-  # =============================================================================
-  adminer:
-    image: adminer:latest
-    container_name: btec-adminer
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - btec-network
-    deploy:
-      resources:
-        limits:
-          memory: 64M
 
   # =============================================================================
   # Backend API Server
@@ -61,13 +45,13 @@ services:
     container_name: btec-backend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-btec}:${POSTGRES_PASSWORD:-btec_dev_password}@postgres:5432/${POSTGRES_DB:-btec_generator}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      AI_MODEL: ${AI_MODEL:-anthropic/claude-3.5-sonnet}
+      AI_MODEL: ${AI_MODEL}
       AI_MAX_TOKENS: ${AI_MAX_TOKENS:-4096}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
@@ -75,8 +59,12 @@ services:
       DISCORD_PUBLIC_KEY: ${DISCORD_PUBLIC_KEY}
       DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID}
       DISCORD_ADMIN_CHANNEL_ID: ${DISCORD_ADMIN_CHANNEL_ID}
-      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      FRONTEND_URL: ${FRONTEND_URL}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
+      GENERATION_LIMIT_PER_HOUR: ${GENERATION_LIMIT_PER_HOUR:-5}
     volumes:
       - backend_exports:/app/exports
     ports:
@@ -92,38 +80,21 @@ services:
       start_period: 40s
     networks:
       - btec-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
 
   # =============================================================================
-  # Frontend (Nginx)
+  # Adminer (Database Admin UI) - Optional
   # =============================================================================
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        VITE_API_URL: /api
-    container_name: btec-frontend
+  adminer:
+    image: adminer:latest
+    container_name: btec-adminer
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8080:8080"
     depends_on:
-      backend:
+      postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - btec-network
-    deploy:
-      resources:
-        limits:
-          memory: 128M
 
 # =============================================================================
 # Volumes
