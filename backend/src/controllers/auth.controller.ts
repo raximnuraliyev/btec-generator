@@ -69,3 +69,13 @@ export const getProfile = async (
     next(error);
   }
 };
+
+export const logout = async (
+  _req: AuthRequest,
+  res: Response,
+  _next: NextFunction
+): Promise<void> => {
+  // JWT is stateless, so we just return success
+  // Client should remove the token from localStorage
+  res.status(200).json({ message: 'Logged out successfully' });
+};

@@ -38,16 +38,17 @@ export function TeacherDashboardPage({ onNavigate }: TeacherDashboardPageProps) 
       // Use the optimized API endpoint
       const result = await briefsApi.getMyBriefsWithStats();
 
-      // Sort briefs by date for recent
-      const recentBriefs = [...result.briefs]
+      // Sort briefs by date for recent (with null check)
+      const briefs = result?.briefs || [];
+      const recentBriefs = [...briefs]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5);
 
       setStats({
-        totalBriefs: result.stats.totalBriefs,
-        totalAssignments: result.stats.totalAssignments,
+        totalBriefs: result?.stats?.totalBriefs || 0,
+        totalAssignments: result?.stats?.totalAssignments || 0,
         recentBriefs,
-        popularBriefs: result.popularBriefs,
+        popularBriefs: result?.popularBriefs || [],
       });
     } catch (err) {
       console.error('[TEACHER_DASHBOARD] Failed to load data:', err);

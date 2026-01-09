@@ -192,24 +192,30 @@ export function HowToUsePage({ onNavigate }: HowToUsePageProps) {
             <section className="bg-white border-2 border-black rounded-xl p-4 sm:p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
               <h2 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
                 <Coins className="w-5 h-5 text-yellow-500" />
-                Understanding Tokens
+                Understanding Plans & Limits
               </h2>
               <p className="text-gray-700 text-sm sm:text-base mb-4">
-                Tokens are the currency used within BTEC Generator to access assignment generation features.
+                Each plan gives you tokens, a time limit, and a specific number of assignments you can generate.
               </p>
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold text-sm mb-2">Plan Restrictions:</h3>
                 <div className="flex justify-between items-center text-sm sm:text-base">
-                  <span className="text-gray-700">Pass Grade Assignment</span>
-                  <span className="font-bold">100 tokens</span>
+                  <span className="text-gray-700">Plan P (Pass)</span>
+                  <span className="text-green-700 text-sm">Can only generate PASS grades</span>
                 </div>
                 <div className="flex justify-between items-center text-sm sm:text-base">
-                  <span className="text-gray-700">Merit Grade Assignment</span>
-                  <span className="font-bold">150 tokens</span>
+                  <span className="text-gray-700">Plan PM (Pass + Merit)</span>
+                  <span className="text-blue-700 text-sm">Can generate PASS or MERIT grades</span>
                 </div>
                 <div className="flex justify-between items-center text-sm sm:text-base">
-                  <span className="text-gray-700">Distinction Grade Assignment</span>
-                  <span className="font-bold">200 tokens</span>
+                  <span className="text-gray-700">Plan PMD (All Grades)</span>
+                  <span className="text-purple-700 text-sm">Can generate any grade level</span>
                 </div>
+              </div>
+              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-amber-800 text-xs sm:text-sm">
+                  <strong>Note:</strong> Each plan has a limited number of assignments and expires after the plan duration. Use <code className="bg-amber-100 px-1 rounded">!status</code> to check your remaining assignments and time.
+                </p>
               </div>
             </section>
 
@@ -223,22 +229,27 @@ export function HowToUsePage({ onNavigate }: HowToUsePageProps) {
                 <PaymentStep 
                   step={1}
                   title="Join Discord & Run !buy"
-                  description="Join our Discord server and use the !buy command to see available token plans and the payment card number."
+                  description="Join our Discord server and use the !buy command to see available token plans with pricing."
                 />
                 <PaymentStep 
                   step={2}
-                  title="Make a Bank Transfer"
-                  description="Transfer the exact amount shown to the displayed payment card using your banking app. Include your Discord username as the reference."
+                  title="Select a Plan"
+                  description="Choose your plan with !buy P, !buy PM, !buy PMD, or !buy custom <grade> <tokens>. You'll receive payment details."
                 />
                 <PaymentStep 
                   step={3}
-                  title="Confirm Your Payment"
-                  description="Use the !confirm command and attach a screenshot of your payment confirmation."
+                  title="Make a Bank Transfer"
+                  description="Transfer the exact amount to the payment card shown. Include your Discord username as reference in the payment."
                 />
                 <PaymentStep 
                   step={4}
-                  title="Receive Your Tokens"
-                  description="Once verified by an admin, your tokens will be added to your account within 24 hours."
+                  title="Wait for Admin Confirmation"
+                  description="An admin will verify your payment and activate your plan. This usually happens within a few hours."
+                />
+                <PaymentStep 
+                  step={5}
+                  title="Start Generating"
+                  description="Once confirmed, your tokens and assignments are ready! Use !status to check your plan details."
                 />
               </div>
               
@@ -253,24 +264,89 @@ export function HowToUsePage({ onNavigate }: HowToUsePageProps) {
 
             {/* Available Plans */}
             <section className="bg-white border-2 border-black rounded-xl p-4 sm:p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <h2 className="text-lg sm:text-xl font-bold mb-4">Available Token Plans</h2>
-              <p className="text-gray-600 text-sm mb-4">Use <code className="bg-gray-100 px-2 py-0.5 rounded">!buy</code> in Discord to see current prices and plans.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <TokenPlanCard 
-                  name="Starter"
-                  tokens={200}
-                  description="Perfect for trying out the platform"
+              <h2 className="text-lg sm:text-xl font-bold mb-4">Available Plans</h2>
+              <p className="text-gray-600 text-sm mb-4">Use <code className="bg-gray-100 px-2 py-0.5 rounded">!buy</code> in Discord to purchase.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <PlanCard 
+                  name="PLAN P"
+                  price="30,000 UZS"
+                  duration="3 days"
+                  assignments={5}
+                  grades="PASS only"
+                  tokens="100,000"
+                  color="green"
                 />
-                <TokenPlanCard 
-                  name="Standard"
-                  tokens={500}
-                  description="Most popular choice"
+                <PlanCard 
+                  name="PLAN PM"
+                  price="50,000 UZS"
+                  duration="5 days"
+                  assignments={7}
+                  grades="PASS & MERIT"
+                  tokens="150,000"
+                  color="blue"
                   highlighted
                 />
-                <TokenPlanCard 
-                  name="Premium"
-                  tokens={1000}
-                  description="Best value for regular users"
+                <PlanCard 
+                  name="PLAN PMD"
+                  price="100,000 UZS"
+                  duration="7 days"
+                  assignments={10}
+                  grades="All grades"
+                  tokens="200,000"
+                  color="purple"
+                />
+                <PlanCard 
+                  name="CUSTOM"
+                  price="1 UZS/token"
+                  duration="One-time"
+                  assignments={1}
+                  grades="Choose grade"
+                  tokens="Min 20k-25k"
+                  color="gray"
+                  isCustom
+                />
+              </div>
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-yellow-800 text-xs sm:text-sm">
+                  <strong>Custom Plan:</strong> Pay per token (1 UZS = 1 token). Minimum tokens: 20,000 for PASS/MERIT, 25,000 for DISTINCTION. One assignment only, no expiry.
+                </p>
+              </div>
+            </section>
+
+            {/* Discord Bot Commands */}
+            <section className="bg-white border-2 border-black rounded-xl p-4 sm:p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <h2 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-[#5865F2]" />
+                Discord Bot Commands
+              </h2>
+              <div className="space-y-3">
+                <CommandItem 
+                  command="!buy"
+                  description="View available plans with pricing and details"
+                />
+                <CommandItem 
+                  command="!buy [plan]"
+                  description="Start purchase for a specific plan (e.g., !buy PM)"
+                />
+                <CommandItem 
+                  command="!buy custom [grade] [tokens]"
+                  description="Buy custom tokens (e.g., !buy custom MERIT 25000)"
+                />
+                <CommandItem 
+                  command="!status"
+                  description="Check your current plan, tokens, and assignments remaining"
+                />
+                <CommandItem 
+                  command="!link [code]"
+                  description="Link your Discord to website account using your profile code"
+                />
+                <CommandItem 
+                  command="!payments"
+                  description="View your payment history"
+                />
+                <CommandItem 
+                  command="!help"
+                  description="Show all available commands"
                 />
               </div>
             </section>
@@ -377,7 +453,7 @@ export function HowToUsePage({ onNavigate }: HowToUsePageProps) {
               <div className="space-y-3">
                 <FAQItem 
                   question="How do I get tokens?"
-                  answer="Join our Discord server and use the !buy command. You'll see available plans and the payment card number. Make a bank transfer and use !confirm with a payment screenshot."
+                  answer="Join our Discord server and use the !buy command to see available plans. Select a plan with !buy P, !buy PM, or !buy PMD, then make a bank transfer. An admin will verify and activate your plan."
                   isOpen={openFAQ === 0}
                   onToggle={() => toggleFAQ(0)}
                 />
@@ -424,10 +500,16 @@ export function HowToUsePage({ onNavigate }: HowToUsePageProps) {
                   onToggle={() => toggleFAQ(7)}
                 />
                 <FAQItem 
-                  question="How do I report an issue?"
-                  answer="Use the 'Report Issue' button in your dashboard or contact us through Discord. We typically respond within 24 hours."
+                  question="Why can't I generate a certain grade?"
+                  answer="Your plan determines which grades you can generate. Plan P allows only PASS, Plan PM allows PASS and MERIT, and Plan PMD allows all grades. You also have a limited number of assignments per plan. Use !status in Discord to check your remaining assignments and allowed grades."
                   isOpen={openFAQ === 8}
                   onToggle={() => toggleFAQ(8)}
+                />
+                <FAQItem 
+                  question="How do I report an issue?"
+                  answer="Use the 'Report Issue' button in your dashboard or contact us through Discord. We typically respond within 24 hours."
+                  isOpen={openFAQ === 9}
+                  onToggle={() => toggleFAQ(9)}
                 />
               </div>
             </section>
@@ -521,6 +603,47 @@ function TokenPlanCard({ name, tokens, description, highlighted }: { name: strin
       <p className="text-2xl font-bold mt-1">{tokens}</p>
       <p className="text-xs text-gray-500">tokens</p>
       <p className="text-xs text-gray-600 mt-2">{description}</p>
+    </div>
+  );
+}
+
+function PlanCard({ name, price, duration, assignments, grades, tokens, color, highlighted, isCustom }: { 
+  name: string; 
+  price: string; 
+  duration: string; 
+  assignments: number; 
+  grades: string; 
+  tokens: string; 
+  color: 'green' | 'blue' | 'purple' | 'gray';
+  highlighted?: boolean;
+  isCustom?: boolean;
+}) {
+  const colorClasses = {
+    green: 'bg-green-50 border-green-300',
+    blue: 'bg-blue-50 border-blue-300',
+    purple: 'bg-purple-50 border-purple-300',
+    gray: 'bg-gray-50 border-gray-300'
+  };
+  
+  return (
+    <div className={`p-4 rounded-lg border-2 ${highlighted ? 'border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]' : colorClasses[color]}`}>
+      <h3 className="font-bold text-base">{name}</h3>
+      <p className="text-xl font-bold mt-1">{price}</p>
+      <div className="mt-3 space-y-1 text-xs text-gray-600">
+        <p>⏱️ {duration}</p>
+        <p>📝 {assignments} assignment{assignments !== 1 ? 's' : ''}</p>
+        <p>🎯 {grades}</p>
+        <p>💎 {tokens} tokens{isCustom ? '*' : ''}</p>
+      </div>
+    </div>
+  );
+}
+
+function CommandItem({ command, description }: { command: string; description: string }) {
+  return (
+    <div className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded">
+      <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-purple-700 flex-shrink-0">{command}</code>
+      <p className="text-gray-600 text-sm">{description}</p>
     </div>
   );
 }

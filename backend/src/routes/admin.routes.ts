@@ -39,6 +39,7 @@ import {
   respondToIssue,
   resolveIssue,
   reopenIssue,
+  setIssueInProgress,
   pauseAllGeneration,
   resumeAllGeneration,
   getSystemStatus,
@@ -148,6 +149,7 @@ router.get('/issues', getAllIssues);
 router.post('/issues/:issueId/respond', respondToIssue);
 router.post('/issues/:issueId/resolve', resolveIssue);
 router.post('/issues/:issueId/reopen', reopenIssue);
+router.post('/issues/:issueId/in-progress', setIssueInProgress);
 
 // =============================================================================
 // SYSTEM CONTROLS

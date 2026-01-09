@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AssignmentProvider } from './context/AssignmentContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginPage } from './components/LoginPage';
 import { DashboardPage } from './components/DashboardPage';
 import { HowToUsePage } from './components/HowToUsePage';
@@ -39,14 +40,16 @@ type Page = 'login' | 'dashboard' | 'how-to-use' | 'create' | 'profile' | 'monit
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <AssignmentProvider>
-          <Toaster position="top-right" richColors />
-          <Router />
-        </AssignmentProvider>
-      </AuthProvider>
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <AuthProvider>
+          <AssignmentProvider>
+            <Toaster position="top-right" richColors />
+            <Router />
+          </AssignmentProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -134,7 +137,7 @@ function Router() {
       return <IssuePage onNavigate={navigate} />;
 
     case 'support':
-      return <SupportPage onBack={() => navigate('dashboard')} />;
+      return <SupportPage onBack={() => navigate('dashboard')} onNavigate={navigate} />;
 
     case 'tokens':
       return <TokenManagementPage onNavigate={navigate} />;

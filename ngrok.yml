@@ -1,3 +1,26 @@
+# =====================================================================
+# NGROK Configuration for BTEC Generator Semi-Host Mode
+# =====================================================================
+# This file configures ngrok to expose the local backend to the internet.
+#
+# HOW TO USE:
+#   1. Run semi-host.ps1 (it uses this config automatically)
+#   2. Or manually: ngrok start --all --config ngrok.yml
+#
+# After ngrok starts:
+#   1. Go to http://localhost:4040 to see the ngrok dashboard
+#   2. Copy the https://xxxx.ngrok.io URL
+#   3. Update VITE_API_URL in Vercel environment variables
+#
+# IMPORTANT: Replace the authtoken with your own from https://dashboard.ngrok.com
+# =====================================================================
+
 version: 3
 agent:
   authtoken: 37q3VVSvxBpYPeORzQy8kkmkL7H_5Yy3Q3UvAWVZbRLpGYthT
+
+tunnels:
+  backend:
+    proto: http
+    addr: 3001
+    inspect: true

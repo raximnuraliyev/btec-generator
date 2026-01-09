@@ -52,7 +52,7 @@ export function TokenManagementPage({ onNavigate }: TokenManagementPageProps) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   
   // Custom plan state
-  const [customTokens, setCustomTokens] = useState(10000);
+  const [customTokens, setCustomTokens] = useState(20000);
   const [customGrade, setCustomGrade] = useState<GradeType>('PASS');
   const [customPrice, setCustomPrice] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('HUMO');
@@ -399,19 +399,49 @@ export function TokenManagementPage({ onNavigate }: TokenManagementPageProps) {
 
           {/* Custom Plan */}
           <Card className="p-4 md:p-6 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200">
-            <h3 className="text-lg md:text-xl font-bold mb-4">Custom Plan</h3>
-            <p className="text-sm md:text-base text-gray-600 mb-4">
-              Need a specific amount of tokens? Create a custom plan tailored to your needs.
+            <h3 className="text-lg md:text-xl font-bold mb-2">Custom Plan (One Assignment)</h3>
+            <p className="text-sm md:text-base text-gray-600 mb-2">
+              Pay per token. One assignment only. Select your target grade.
             </p>
+            <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <p className="text-xs md:text-sm text-yellow-800">
+                <strong>Minimum tokens by grade:</strong> PASS/MERIT: 20,000 • DISTINCTION: 25,000
+                <br />
+                <strong>Rate:</strong> 1 UZS per token (e.g., 20,000 tokens = 20,000 UZS)
+              </p>
+            </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tokens (min 5,000)
+                  Target Grade
+                </label>
+                <select
+                  value={customGrade}
+                  onChange={(e) => {
+                    const grade = e.target.value as GradeType;
+                    setCustomGrade(grade);
+                    // Update min tokens based on grade
+                    const minTokens = grade === 'DISTINCTION' ? 25000 : 20000;
+                    if (customTokens < minTokens) {
+                      setCustomTokens(minTokens);
+                    }
+                    setCustomPrice(null);
+                  }}
+                  className="w-full px-3 py-2 border rounded-md min-h-[44px]"
+                >
+                  <option value="PASS">Pass (min 20,000 tokens)</option>
+                  <option value="MERIT">Merit (min 20,000 tokens)</option>
+                  <option value="DISTINCTION">Distinction (min 25,000 tokens)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tokens (min {customGrade === 'DISTINCTION' ? '25,000' : '20,000'})
                 </label>
                 <input
                   type="number"
-                  min={5000}
+                  min={customGrade === 'DISTINCTION' ? 25000 : 20000}
                   step={1000}
                   value={customTokens}
                   onChange={(e) => {
@@ -420,20 +450,6 @@ export function TokenManagementPage({ onNavigate }: TokenManagementPageProps) {
                   }}
                   className="w-full px-3 py-2 border rounded-md min-h-[44px]"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Target Grade
-                </label>
-                <select
-                  value={customGrade}
-                  onChange={(e) => setCustomGrade(e.target.value as GradeType)}
-                  className="w-full px-3 py-2 border rounded-md min-h-[44px]"
-                >
-                  <option value="PASS">Pass</option>
-                  <option value="MERIT">Merit</option>
-                  <option value="DISTINCTION">Distinction</option>
-                </select>
               </div>
               <div className="flex items-end">
                 <Button onClick={calculateCustom} variant="outline" className="w-full min-h-[44px]">

@@ -701,6 +701,25 @@ export const reopenIssue = async (
   }
 };
 
+export const setIssueInProgress = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { issueId } = req.params;
+
+    await prisma.issue.update({
+      where: { id: issueId },
+      data: { status: 'IN_PROGRESS' },
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // =============================================================================
 // SYSTEM CONTROLS
 // =============================================================================

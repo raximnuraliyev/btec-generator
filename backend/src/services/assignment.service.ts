@@ -3,6 +3,72 @@ import { prisma } from '../lib/prisma';
 import { InputFieldDefinition, StudentInputData, StudentProfileSnapshot } from '../types';
 
 /**
+ * Check if user's plan allows the selected grade
+ */
+async function validatePlanForGrade(userId: string, grade: Grade): Promise<void> {
+  // Get user with role
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+
+  // VIP and ADMIN have unlimited access
+  if (user?.role === 'VIP' || user?.role === 'ADMIN') {
+    return;
+  }
+
+  // Get user's token plan
+  const tokenPlan = await prisma.tokenPlan.findUnique({
+    where: { userId },
+  });
+
+  if (!tokenPlan) {
+    throw new Error('No active plan found. Please purchase a plan to generate assignments.');
+  }
+
+  // Check if plan has expired
+  if (tokenPlan.expiresAt && new Date() > tokenPlan.expiresAt) {
+    throw new Error('Your plan has expired. Please purchase a new plan to continue generating assignments.');
+  }
+
+  // Check if plan has enough tokens
+  if (tokenPlan.tokensRemaining <= 0 && tokenPlan.planType !== 'UNLIMITED') {
+    throw new Error('Insufficient tokens. Please purchase more tokens to generate assignments.');
+  }
+
+  // Check if user has assignments remaining (for paid plans)
+  if (tokenPlan.assignmentsAllowed > 0 && tokenPlan.assignmentsUsed >= tokenPlan.assignmentsAllowed) {
+    throw new Error(`You have reached your assignment limit (${tokenPlan.assignmentsAllowed}). Please upgrade your plan.`);
+  }
+
+  // Check if grade is allowed by the plan
+  const allowedGrades = tokenPlan.allowedGrades || [];
+  if (allowedGrades.length > 0 && !allowedGrades.includes(grade)) {
+    const planName = tokenPlan.planType === 'BASIC' ? 'Pass Only' :
+                     tokenPlan.planType === 'PRO' ? 'Pass + Merit' :
+                     tokenPlan.planType === 'UNLIMITED' ? 'All Grades' : 'Current';
+    throw new Error(`Your ${planName} plan does not allow ${grade} grade assignments. Allowed grades: ${allowedGrades.join(', ')}`);
+  }
+
+  // FREE plan restrictions
+  if (tokenPlan.planType === 'FREE') {
+    throw new Error('FREE plan does not allow assignment generation. Please purchase a plan.');
+  }
+}
+
+/**
+ * Increment assignments used count after successful creation
+ */
+async function incrementAssignmentsUsed(userId: string): Promise<void> {
+  await prisma.tokenPlan.update({
+    where: { userId },
+    data: {
+      assignmentsUsed: { increment: 1 },
+    },
+  });
+}
+
+/**
  * Create assignment in DRAFT status
  * Student must fill required inputs before generation can start
  */
@@ -14,6 +80,9 @@ export const createAssignment = async (
   includeImages: boolean,
   includeTables: boolean
 ) => {
+  // Validate user's plan allows this grade
+  await validatePlanForGrade(userId, grade);
+
   // Check student profile
   const profile = await prisma.studentProfile.findUnique({
     where: { userId },
@@ -95,6 +164,9 @@ export const createAssignment = async (
       snapshot: true,
     },
   });
+
+  // Increment assignments used count
+  await incrementAssignmentsUsed(userId);
 
   return assignment;
 };

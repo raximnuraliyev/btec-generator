@@ -7,7 +7,8 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { 
   ArrowLeft, AlertCircle, CheckCircle, Clock, Send,
-  Plus, ChevronDown, ChevronUp, MessageSquare, ExternalLink
+  Plus, ChevronDown, ChevronUp, MessageSquare, ExternalLink,
+  HelpCircle
 } from 'lucide-react';
 
 const DISCORD_INVITE_LINK = 'https://discord.gg/wjPGhY6X';
@@ -27,6 +28,7 @@ interface Issue {
 
 interface SupportPageProps {
   onBack: () => void;
+  onNavigate?: (page: string, assignmentId?: string) => void;
 }
 
 const CATEGORIES = [
@@ -38,7 +40,7 @@ const CATEGORIES = [
   { value: 'OTHER', label: 'Other' }
 ];
 
-export function SupportPage({ onBack }: SupportPageProps) {
+export function SupportPage({ onBack, onNavigate }: SupportPageProps) {
   const { user } = useAuth();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,13 +134,25 @@ export function SupportPage({ onBack }: SupportPageProps) {
               </Button>
               <h1 className="text-lg md:text-xl font-bold">Support & Issues</h1>
             </div>
-            <Button 
-              onClick={() => setShowNewForm(!showNewForm)}
-              className="bg-black text-white hover:bg-gray-800 min-h-[44px]"
-            >
-              <Plus className="w-4 h-4 md:mr-2" />
-              <span className="hidden sm:inline">New Issue</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              {onNavigate && (
+                <Button 
+                  variant="outline"
+                  onClick={() => onNavigate('how-to-use')}
+                  className="border-2 border-black min-h-[44px]"
+                >
+                  <HelpCircle className="w-4 h-4 md:mr-2" />
+                  <span className="hidden sm:inline">FAQ</span>
+                </Button>
+              )}
+              <Button 
+                onClick={() => setShowNewForm(!showNewForm)}
+                className="bg-black text-white hover:bg-gray-800 min-h-[44px]"
+              >
+                <Plus className="w-4 h-4 md:mr-2" />
+                <span className="hidden sm:inline">New Issue</span>
+              </Button>
+            </div>
           </div>
         </div>
       </header>

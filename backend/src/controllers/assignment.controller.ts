@@ -376,10 +376,13 @@ export const create = async (
     const needsInputs = requiredInputs && requiredInputs.length > 0;
 
     res.status(201).json({
-      id: assignment.id,
-      status: assignment.status,
-      needsInputs,
-      requiredInputs: requiredInputs || [],
+      assignment: {
+        id: assignment.id,
+        status: assignment.status,
+        briefSnapshot: assignment.snapshot,
+        needsInputs,
+        requiredInputs: requiredInputs || [],
+      },
       message: needsInputs
         ? 'Assignment created. Please complete the required inputs before generating.'
         : 'Assignment created. Ready to generate.',

@@ -126,11 +126,12 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  private getAuthHeaders(): HeadersInit {
+  private getAuthHeaders(includeDisclaimer = false): HeadersInit {
     const token = localStorage.getItem('btec_token');
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
+      ...(includeDisclaimer && { 'X-Disclaimer-Accepted': 'true' }),
     };
   }
 
@@ -139,7 +140,7 @@ class ApiClient {
       const errorData = await response.json().catch(() => ({
         error: { message: 'An error occurred', code: 'UNKNOWN_ERROR', statusCode: response.status },
       }));
-      throw new ApiError(errorData.error?.message || 'Request failed', errorData.error?.code || 'UNKNOWN_ERROR');
+      throw new ApiError(errorData.error?.message || errorData.message || 'Request failed', errorData.error?.code || 'UNKNOWN_ERROR');
     }
     return response.json();
   }
@@ -152,10 +153,10 @@ class ApiClient {
     return this.handleResponse<T>(response);
   }
 
-  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown, options?: { includeDisclaimer?: boolean }): Promise<T> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: 'POST',
-      headers: this.getAuthHeaders(),
+      headers: this.getAuthHeaders(options?.includeDisclaimer),
       body: data ? JSON.stringify(data) : undefined,
     });
     return this.handleResponse<T>(response);
@@ -344,7 +345,11 @@ export const assignmentsApi = {
     targetGrade: 'PASS' | 'MERIT' | 'DISTINCTION';
     language?: string;
   }) =>
-    api.post<{ assignment: AssignmentResponse }>('/assignments', data),
+    api.post<{ assignment: AssignmentResponse }>('/assignments', {
+      briefId: data.briefId,
+      grade: data.targetGrade, // Backend expects 'grade' not 'targetGrade'
+      language: data.language || 'en',
+    }, { includeDisclaimer: true }),
 
   /**
    * Save student inputs for an assignment
@@ -357,7 +362,7 @@ export const assignmentsApi = {
    * Start generation after student inputs are complete
    */
   startGeneration: (assignmentId: string) =>
-    api.post<{ assignment: AssignmentResponse; jobId: string }>(`/assignments/${assignmentId}/generate`, {}),
+    api.post<{ assignment: AssignmentResponse; jobId: string }>(`/assignments/${assignmentId}/generate`, {}, { includeDisclaimer: true }),
 
   /**
    * Check if student has completed required inputs
@@ -727,6 +732,9 @@ export const adminApi = {
 
   reopenIssue: (issueId: string) =>
     api.post<{ success: boolean }>(`/admin/issues/${issueId}/reopen`),
+
+  setIssueInProgress: (issueId: string) =>
+    api.post<{ success: boolean }>(`/admin/issues/${issueId}/in-progress`),
 
   // Stats
   getStats: () =>

@@ -1,20 +1,25 @@
 # =====================================================================
-# DOCKER COMPOSE - FULL LOCAL (Everything in Docker)
+# DOCKER COMPOSE - SEMI-LOCAL (Backend + DB in Docker, Frontend on Vercel)
 # =====================================================================
-# This runs ALL services locally in Docker:
-#   - Frontend (React + Vite served by Nginx)
-#   - Backend (Node.js API)
+# This runs backend services in Docker while frontend is on Vercel:
+#   - Backend (Node.js API) - exposed via ngrok for Vercel
 #   - PostgreSQL Database
 #   - Adminer (Database UI)
 #
+# Frontend is deployed separately on Vercel and connects via ngrok URL.
+#
 # Usage:
-#   docker-compose -f docker-compose.local.yml up -d --build
-#   docker-compose -f docker-compose.local.yml down
-#   docker-compose -f docker-compose.local.yml logs -f
+#   docker-compose -f docker-compose.vercel.yml up -d --build
+#   docker-compose -f docker-compose.vercel.yml down
+#   docker-compose -f docker-compose.vercel.yml logs -f
+#
+# After starting, run ngrok to expose backend:
+#   ngrok http 3000
+#
+# Then update VITE_API_URL in Vercel with the ngrok URL.
 #
 # Access:
-#   Frontend:  http://localhost
-#   Backend:   http://localhost:3000
+#   Backend:   http://localhost:3000 (or ngrok URL)
 #   Adminer:   http://localhost:8080
 # =====================================================================
 
@@ -24,23 +29,23 @@ services:
   # =============================================================================
   postgres:
     image: postgres:16-alpine
-    container_name: btec-postgres
+    container_name: btec-postgres-vercel
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-btec}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-btec_dev_password}
       POSTGRES_DB: ${POSTGRES_DB:-btec_generator}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_vercel:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Use 5433 externally to avoid conflict with local-host
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-btec} -d ${POSTGRES_DB:-btec_generator}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - btec-network
+      - btec-network-vercel
 
   # =============================================================================
   # Backend API Server
@@ -49,7 +54,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: btec-backend
+    container_name: btec-backend-vercel
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -69,16 +74,16 @@ services:
       DISCORD_ADMIN_CHANNEL_ID: ${DISCORD_ADMIN_CHANNEL_ID}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
       DISCORD_ENABLED: ${DISCORD_ENABLED:-true}
-      # For full local: frontend is on localhost (nginx)
-      CORS_ORIGIN: http://localhost,http://localhost:80,http://localhost:5173
-      FRONTEND_URL: http://localhost
+      # For Vercel: include all possible frontend origins
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://www.btecgenerator.page,https://btec-generator-git-main-raximnuraliyevs-projects.vercel.app,http://localhost:5173}
+      FRONTEND_URL: ${FRONTEND_URL:-https://www.btecgenerator.page}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
       GENERATION_LIMIT_PER_HOUR: ${GENERATION_LIMIT_PER_HOUR:-5}
     volumes:
-      - backend_exports:/app/exports
+      - backend_exports_vercel:/app/exports
     ports:
-      - "3000:3000"
+      - "3001:3000"  # Use 3001 externally to avoid conflict with local-host
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,55 +94,38 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - btec-network
-
-  # =============================================================================
-  # Frontend (React + Vite + Nginx)
-  # =============================================================================
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: btec-frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - btec-network
+      - btec-network-vercel
 
   # =============================================================================
   # Adminer (Database Admin UI)
   # =============================================================================
   adminer:
     image: adminer:latest
-    container_name: btec-adminer
+    container_name: btec-adminer-vercel
     restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: postgres
       ADMINER_DESIGN: nette
     ports:
-      - "8080:8080"
+      - "8081:8080"  # Use 8081 externally to avoid conflict with local-host
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - btec-network
+      - btec-network-vercel
 
 # =============================================================================
 # Networks
 # =============================================================================
 networks:
-  btec-network:
+  btec-network-vercel:
     driver: bridge
 
 # =============================================================================
 # Volumes
 # =============================================================================
 volumes:
-  postgres_data:
+  postgres_data_vercel:
     driver: local
-  backend_exports:
+  backend_exports_vercel:
     driver: local

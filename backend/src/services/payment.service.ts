@@ -24,40 +24,49 @@ export const PAYMENT_PLANS = {
   P: {
     name: 'Pass Only',
     basePrice: 30000,        // 30,000 UZS
-    tokensPerMonth: 20000,
-    assignments: 5,
+    tokensPerMonth: 100000,  // 100,000 token cap
+    assignments: 5,          // Max 5 assignments
     grades: ['PASS'] as Grade[],
-    durationDays: 30,
+    durationDays: 3,         // 3 days duration
   },
   PM: {
     name: 'Pass + Merit',
     basePrice: 50000,        // 50,000 UZS
-    tokensPerMonth: 50000,
-    assignments: 10,
+    tokensPerMonth: 150000,  // 150,000 token cap
+    assignments: 7,          // Max 7 assignments
     grades: ['PASS', 'MERIT'] as Grade[],
-    durationDays: 30,
+    durationDays: 5,         // 5 days duration
   },
   PMD: {
     name: 'Pass + Merit + Distinction',
-    basePrice: 70000,        // 70,000 UZS
-    tokensPerMonth: 100000,
-    assignments: 20,
+    basePrice: 100000,       // 100,000 UZS
+    tokensPerMonth: 200000,  // 200,000 token cap
+    assignments: 10,         // Max 10 assignments
     grades: ['PASS', 'MERIT', 'DISTINCTION'] as Grade[],
-    durationDays: 30,
+    durationDays: 7,         // 7 days duration
   },
   CUSTOM: {
-    name: 'Custom Plan',
-    basePrice: 0,            // Calculated based on tokens
-    tokensPerMonth: 0,
-    assignments: 1,
-    grades: [] as Grade[],
-    durationDays: 30,
+    name: 'Custom Plan (One-Time)',
+    basePrice: 0,            // Calculated based on tokens + grade
+    tokensPerMonth: 0,       // User selected
+    assignments: 1,          // ONE assignment only
+    grades: [] as Grade[],   // User selected
+    durationDays: 7,         // 7 days to use
   },
 };
 
-// Custom plan pricing: 1 UZS per 10 tokens (minimum 5000 tokens = 500 UZS)
-export const CUSTOM_PLAN_RATE = 0.1; // UZS per token
-export const MIN_CUSTOM_TOKENS = 5000;
+// Custom plan pricing: 1 UZS per token
+// Minimum tokens based on grade:
+// PASS: 20,000 tokens (20,000 UZS)
+// MERIT: 20,000 tokens (20,000 UZS)
+// DISTINCTION: 25,000 tokens (25,000 UZS)
+export const CUSTOM_PLAN_RATE = 1; // 1 UZS per token
+export const CUSTOM_MIN_TOKENS = {
+  PASS: 20000,
+  MERIT: 20000,
+  DISTINCTION: 25000,
+};
+export const MIN_CUSTOM_TOKENS = 20000; // Absolute minimum
 
 // Default payment card - can be overridden by database setting
 export const DEFAULT_PAYMENT_CARD = '9680 3501 4687 8359';
@@ -124,13 +133,26 @@ function calculateFinalAmount(baseAmount: number, suffix: number): number {
 }
 
 /**
- * Calculate custom plan price
+ * Calculate custom plan price based on tokens and grade
+ * Minimum tokens based on grade:
+ * - PASS: 20,000 tokens (20,000 UZS)
+ * - MERIT: 20,000 tokens (20,000 UZS)
+ * - DISTINCTION: 25,000 tokens (25,000 UZS)
  */
-export function calculateCustomPlanPrice(tokens: number): number {
-  if (tokens < MIN_CUSTOM_TOKENS) {
-    throw new Error(`Minimum tokens for custom plan is ${MIN_CUSTOM_TOKENS}`);
+export function calculateCustomPlanPrice(tokens: number, grade?: Grade): number {
+  const minTokens = grade ? CUSTOM_MIN_TOKENS[grade] : MIN_CUSTOM_TOKENS;
+  if (tokens < minTokens) {
+    throw new Error(`Minimum tokens for ${grade || 'custom plan'} is ${minTokens.toLocaleString()}`);
   }
+  // 1 UZS per token
   return Math.ceil(tokens * CUSTOM_PLAN_RATE);
+}
+
+/**
+ * Get minimum tokens required for a grade
+ */
+export function getMinTokensForGrade(grade: Grade): number {
+  return CUSTOM_MIN_TOKENS[grade] || MIN_CUSTOM_TOKENS;
 }
 
 // =============================================================================
@@ -168,7 +190,12 @@ export async function createPayment(params: CreatePaymentParams) {
     if (!customTokens || !customGrade) {
       throw new Error('Custom plan requires tokens and grade selection');
     }
-    baseAmount = calculateCustomPlanPrice(customTokens);
+    // Validate minimum tokens for the selected grade
+    const minTokens = getMinTokensForGrade(customGrade);
+    if (customTokens < minTokens) {
+      throw new Error(`Minimum tokens for ${customGrade} grade is ${minTokens.toLocaleString()} (${minTokens.toLocaleString()} UZS)`);
+    }
+    baseAmount = calculateCustomPlanPrice(customTokens, customGrade);
   } else {
     baseAmount = PAYMENT_PLANS[planType].basePrice;
   }
@@ -420,7 +447,7 @@ export async function approvePayment(paymentId: string, adminUserId: string) {
     where: { userId: payment.userId },
     create: {
       userId: payment.userId,
-      planType: payment.planType === 'CUSTOM' ? 'BASIC' : 
+      planType: payment.planType === 'CUSTOM' ? 'PAID' : 
                 payment.planType === 'P' ? 'BASIC' :
                 payment.planType === 'PM' ? 'PRO' : 'UNLIMITED',
       tokensPerMonth: tokensGranted,
@@ -428,9 +455,12 @@ export async function approvePayment(paymentId: string, adminUserId: string) {
       resetAt: planExpiresAt,
       activatedAt: new Date(),
       expiresAt: planExpiresAt,
+      allowedGrades: gradesGranted,
+      assignmentsAllowed: assignmentsGranted,
+      assignmentsUsed: 0,
     },
     update: {
-      planType: payment.planType === 'CUSTOM' ? 'BASIC' : 
+      planType: payment.planType === 'CUSTOM' ? 'PAID' : 
                 payment.planType === 'P' ? 'BASIC' :
                 payment.planType === 'PM' ? 'PRO' : 'UNLIMITED',
       tokensPerMonth: tokensGranted,
@@ -438,6 +468,9 @@ export async function approvePayment(paymentId: string, adminUserId: string) {
       resetAt: planExpiresAt,
       activatedAt: new Date(),
       expiresAt: planExpiresAt,
+      allowedGrades: gradesGranted,
+      assignmentsAllowed: assignmentsGranted,
+      assignmentsUsed: 0, // Reset on new plan purchase
     },
   });
 
@@ -632,9 +665,21 @@ export function getAvailablePlans() {
     price: config.basePrice,
     priceFormatted: config.basePrice.toLocaleString('uz-UZ') + ' UZS',
     tokensPerMonth: config.tokensPerMonth,
+    tokenCap: config.tokensPerMonth, // Alias for clarity
     assignments: config.assignments,
     grades: config.grades,
     durationDays: config.durationDays,
     isCustom: type === 'CUSTOM',
+    // Custom plan specific info
+    ...(type === 'CUSTOM' && {
+      minTokens: CUSTOM_MIN_TOKENS,
+      customPriceRate: CUSTOM_PLAN_RATE,
+      customMinTokensByGrade: {
+        PASS: CUSTOM_MIN_TOKENS.PASS,
+        MERIT: CUSTOM_MIN_TOKENS.MERIT,
+        DISTINCTION: CUSTOM_MIN_TOKENS.DISTINCTION,
+      },
+      warning: 'Custom plan applies to ONE assignment only. Leftover tokens remain in wallet. No refunds.',
+    }),
   }));
 }

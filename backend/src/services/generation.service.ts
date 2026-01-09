@@ -788,6 +788,7 @@ export async function getGenerationStatus(assignmentId: string, userId: string) 
   return {
     // Old format fields for compatibility
     id: assignment.id,
+    assignmentId: assignment.id,
     jobId: assignment.id,
     status: assignment.status,
     currentStage: stage,

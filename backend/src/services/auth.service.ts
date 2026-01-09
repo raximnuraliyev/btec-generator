@@ -7,6 +7,7 @@ import { generateToken } from '../utils/jwt';
 import { AuthResponse, JWTPayload } from '../types';
 import { prisma } from '../lib/prisma';
 import { UserStatus } from '@prisma/client';
+import { initializeTokenPlan } from './token.service';
 
 export const registerUser = async (
   email: string,
@@ -28,10 +29,10 @@ export const registerUser = async (
       password: hashedPassword,
       status: UserStatus.ACTIVE,
     },
-    include: {
-      tokenPlan: true,
-    },
   });
+
+  // Initialize token plan for new user
+  const tokenPlan = await initializeTokenPlan(user.id);
 
   const payload: JWTPayload = {
     userId: user.id,
@@ -49,11 +50,11 @@ export const registerUser = async (
       name: user.name,
       role: user.role,
       status: user.status,
-      tokenPlan: user.tokenPlan ? {
-        planType: user.tokenPlan.planType,
-        tokensRemaining: user.tokenPlan.tokensRemaining,
-        tokensPerMonth: user.tokenPlan.tokensPerMonth,
-      } : null,
+      tokenPlan: {
+        planType: tokenPlan.planType,
+        tokensRemaining: tokenPlan.tokensRemaining,
+        tokensPerMonth: tokenPlan.tokensPerMonth,
+      },
     },
   };
 };

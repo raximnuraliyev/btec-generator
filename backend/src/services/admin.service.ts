@@ -40,6 +40,11 @@ export const getDashboardStats = async () => {
   ]);
 
   return {
+    // New names for frontend
+    users: totalUsers,
+    assignments: totalAssignments,
+    activeGenerations: generatingAssignments,
+    // Legacy names for backwards compatibility
     totalUsers,
     totalAssignments,
     totalBriefs,
@@ -117,7 +122,9 @@ export const getOverviewStats = async () => {
     },
     generation: {
       avgTime: 0, // Would need actual tracking
-      successRate: 0.95, // Placeholder
+      successRate: totalAssignments > 0 
+        ? (await prisma.assignment.count({ where: { status: 'COMPLETED' } })) / totalAssignments 
+        : 0, // Dynamic calculation based on actual completions
       failureReasons: [],
     },
   };

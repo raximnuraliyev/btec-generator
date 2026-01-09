@@ -5,7 +5,7 @@ import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription } from './ui/alert';
-import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { studentsApi, briefsApi, assignmentsApi } from '../services/api';
 import { useAssignments } from '../context/AssignmentContext';
 
@@ -205,6 +205,17 @@ export default function AssignmentWizard({ onNavigate }: AssignmentWizardProps) 
       </div>
 
       <div className="container max-w-4xl mx-auto px-4 py-4 sm:py-8">
+        {/* Desktop Back Button */}
+        <div className="hidden sm:block mb-4">
+          <Button
+            variant="outline"
+            onClick={() => onNavigate('dashboard')}
+            className="flex items-center gap-2 min-h-[44px]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </div>
         <Card>
           <CardHeader className="pb-4 sm:pb-6">
             <div className="flex items-center justify-between">

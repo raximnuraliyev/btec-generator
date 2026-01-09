@@ -129,6 +129,18 @@ export function AdminIssuesTab() {
     }
   };
 
+  const handleSetInProgress = async (issueId: string) => {
+    setActionLoading(issueId);
+    try {
+      await adminApi.setIssueInProgress(issueId);
+      await refreshAll();
+    } catch (error) {
+      alert('Failed to set in progress: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'HIGH': return 'bg-red-100 text-red-800 border-red-300';
@@ -317,14 +329,47 @@ export function AdminIssuesTab() {
                     )}
                     
                     {issue.status === 'OPEN' && (
-                      <Button
-                        onClick={() => handleResolve(issue.id)}
-                        disabled={actionLoading === issue.id}
-                        className="bg-green-600 text-white hover:bg-green-700 min-h-[44px]"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        {actionLoading === issue.id ? 'Processing...' : 'Mark Resolved'}
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleSetInProgress(issue.id)}
+                          disabled={actionLoading === issue.id}
+                          className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 min-h-[44px]"
+                        >
+                          <Clock className="w-4 h-4 mr-2" />
+                          {actionLoading === issue.id ? 'Processing...' : 'Set In Progress'}
+                        </Button>
+                        <Button
+                          onClick={() => handleResolve(issue.id)}
+                          disabled={actionLoading === issue.id}
+                          className="bg-green-600 text-white hover:bg-green-700 min-h-[44px]"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          {actionLoading === issue.id ? 'Processing...' : 'Mark Resolved'}
+                        </Button>
+                      </>
+                    )}
+                    
+                    {issue.status === 'IN_PROGRESS' && (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleReopen(issue.id)}
+                          disabled={actionLoading === issue.id}
+                          className="border-2 border-orange-500 text-orange-600 hover:bg-orange-50 min-h-[44px]"
+                        >
+                          <AlertCircle className="w-4 h-4 mr-2" />
+                          {actionLoading === issue.id ? 'Processing...' : 'Back to Open'}
+                        </Button>
+                        <Button
+                          onClick={() => handleResolve(issue.id)}
+                          disabled={actionLoading === issue.id}
+                          className="bg-green-600 text-white hover:bg-green-700 min-h-[44px]"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          {actionLoading === issue.id ? 'Processing...' : 'Mark Resolved'}
+                        </Button>
+                      </>
                     )}
                     
                     {issue.status === 'RESOLVED' && (

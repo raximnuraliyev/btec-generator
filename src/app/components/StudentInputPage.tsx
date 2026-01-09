@@ -7,9 +7,11 @@ import { assignmentsApi } from '../services/api';
 import { StudentInputForm } from './StudentInputForm';
 import type { Brief, StudentInputData, InputFieldDefinition } from '../types';
 
+type Page = 'login' | 'dashboard' | 'how-to-use' | 'create' | 'profile' | 'monitor' | 'review' | 'admin' | 'issues' | 'support' | 'tokens' | 'briefs' | 'create-brief' | 'preview' | 'teacher' | 'student-inputs' | 'terms' | 'privacy' | 'disclaimer';
+
 interface StudentInputPageProps {
   assignmentId: string;
-  onNavigate: (page: 'monitor' | 'dashboard' | string, id?: string) => void;
+  onNavigate: (page: Page, id?: string) => void;
 }
 
 interface AssignmentWithInputs {

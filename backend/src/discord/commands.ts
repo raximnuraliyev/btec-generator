@@ -131,9 +131,14 @@ const commands: CommandHandler[] = [
       helpText += '`!link <code>` - Link your Discord (get code from website)\n';
       helpText += '`!unlink` - Unlink your Discord account\n';
       helpText += '`!profile` - View your profile\n';
+      helpText += '`!status` - View your plan & token status\n';
       helpText += '`!tokens` - View token balance\n';
       helpText += '`!assignments` - List your assignments\n';
       helpText += '`!assignment <id>` - View assignment status\n';
+      helpText += '\n**Payment Commands:**\n';
+      helpText += '`!buy` - View available plans\n';
+      helpText += '`!buy <P|PM|PMD>` - Start a plan purchase\n';
+      helpText += '`!buy custom <grade> <tokens>` - Buy custom tokens\n';
       helpText += '`!payments` - View payment history\n';
       helpText += '`!support` - Get support info\n';
 
@@ -346,6 +351,210 @@ For urgent issues, contact an admin directly.
 Website: https://btec-generator.com`;
 
       await reply(text);
+    },
+  },
+
+  // ============ PAYMENT COMMANDS ============
+  {
+    name: 'buy',
+    description: 'View plans and start a purchase',
+    usage: '!buy [plan] OR !buy custom <grade> <tokens>',
+    execute: async (args, user, reply) => {
+      const { prisma } = await import('../lib/prisma');
+      const { PAYMENT_PLANS, CUSTOM_MIN_TOKENS, getPaymentCard } = await import('../services/payment.service');
+      
+      const linkedUser = await discordBotService.getUserByDiscordId(user.id);
+      
+      // Get payment card
+      const paymentCard = await getPaymentCard();
+      
+      // No arguments - show available plans
+      if (!args[0]) {
+        const embed = new EmbedBuilder()
+          .setTitle('Available Plans')
+          .setColor(0x000000)
+          .setDescription(`**Payment Card:** \`${paymentCard}\`\n\nUse \`!buy <plan>\` to start a purchase.`)
+          .addFields(
+            { 
+              name: '📗 PLAN P (Pass Only)', 
+              value: `**30,000 UZS** - 3 days\n• 5 assignments\n• 100,000 tokens\n• PASS grade only\n\n\`!buy P\``, 
+              inline: true 
+            },
+            { 
+              name: '📘 PLAN PM (Pass + Merit)', 
+              value: `**50,000 UZS** - 5 days\n• 7 assignments\n• 150,000 tokens\n• PASS & MERIT grades\n\n\`!buy PM\``, 
+              inline: true 
+            },
+            { 
+              name: '📙 PLAN PMD (All Grades)', 
+              value: `**100,000 UZS** - 7 days\n• 10 assignments\n• 200,000 tokens\n• All grades\n\n\`!buy PMD\``, 
+              inline: true 
+            },
+            { 
+              name: '🔧 Custom Plan', 
+              value: `**1 UZS per token** - One assignment only\n• Min: 20,000 tokens (PASS/MERIT)\n• Min: 25,000 tokens (DISTINCTION)\n\n\`!buy custom PASS 25000\``, 
+              inline: false 
+            }
+          )
+          .setFooter({ text: 'After transfer, admin will verify and activate your plan.' })
+          .setTimestamp();
+
+        await reply({ embeds: [embed] });
+        return;
+      }
+
+      // Check if user is linked
+      if (!linkedUser) {
+        await reply('❌ Please link your account first using `!link <code>` (get the code from the website dashboard).');
+        return;
+      }
+
+      // Check for existing pending payment
+      const existingPayment = await prisma.paymentTransaction.findFirst({
+        where: {
+          userId: linkedUser.id,
+          status: 'WAITING_PAYMENT',
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+      if (existingPayment) {
+        await reply(`❌ You already have a pending payment.\n\nPayment ID: \`${existingPayment.id}\`\nAmount: **${existingPayment.finalAmount.toFixed(2)} UZS**\nExpires: ${new Date(existingPayment.expiresAt).toLocaleString()}\n\nPlease complete this payment or wait for it to expire.`);
+        return;
+      }
+
+      const planArg = args[0].toUpperCase();
+
+      // Handle custom plan
+      if (planArg === 'CUSTOM') {
+        const grade = args[1]?.toUpperCase();
+        const tokens = parseInt(args[2] || '0');
+
+        if (!grade || !['PASS', 'MERIT', 'DISTINCTION'].includes(grade)) {
+          await reply('❌ Invalid grade. Usage: `!buy custom <PASS|MERIT|DISTINCTION> <tokens>`\n\nExample: `!buy custom MERIT 25000`');
+          return;
+        }
+
+        const minTokens = CUSTOM_MIN_TOKENS[grade as keyof typeof CUSTOM_MIN_TOKENS];
+        if (!tokens || tokens < minTokens) {
+          await reply(`❌ Minimum tokens for ${grade} grade is **${minTokens.toLocaleString()}**.\n\nUsage: \`!buy custom ${grade} ${minTokens}\``);
+          return;
+        }
+
+        // Create payment
+        const { createPayment } = await import('../services/payment.service');
+        try {
+          const result = await createPayment({
+            userId: linkedUser.id,
+            planType: 'CUSTOM',
+            customTokens: tokens,
+            customGrade: grade as any,
+          });
+
+          const embed = new EmbedBuilder()
+            .setTitle('Payment Created - Custom Plan')
+            .setColor(0xFFAA00)
+            .setDescription(`Transfer the **exact** amount below to complete your purchase.`)
+            .addFields(
+              { name: 'Payment Card', value: `\`${paymentCard}\``, inline: false },
+              { name: 'Amount to Pay', value: `**${result.payment.finalAmount.toFixed(2)} UZS**`, inline: true },
+              { name: 'Grade', value: grade, inline: true },
+              { name: 'Tokens', value: tokens.toLocaleString(), inline: true },
+              { name: 'Payment ID', value: `\`${result.payment.id}\``, inline: false },
+              { name: 'Expires', value: new Date(result.payment.expiresAt).toLocaleString(), inline: true }
+            )
+            .setFooter({ text: 'Pay the EXACT amount (including decimals). Admin will verify your payment.' })
+            .setTimestamp();
+
+          await reply({ embeds: [embed] });
+        } catch (error: any) {
+          await reply(`❌ Error: ${error.message}`);
+        }
+        return;
+      }
+
+      // Handle standard plans (P, PM, PMD)
+      if (!['P', 'PM', 'PMD'].includes(planArg)) {
+        await reply('❌ Invalid plan. Use `!buy` to see available plans.\n\nValid plans: `P`, `PM`, `PMD`, `custom`');
+        return;
+      }
+
+      const planConfig = PAYMENT_PLANS[planArg as keyof typeof PAYMENT_PLANS];
+
+      // Create payment
+      const { createPayment } = await import('../services/payment.service');
+      try {
+        const result = await createPayment({
+          userId: linkedUser.id,
+          planType: planArg as any,
+        });
+
+        const embed = new EmbedBuilder()
+          .setTitle(`Payment Created - Plan ${planArg}`)
+          .setColor(0xFFAA00)
+          .setDescription(`Transfer the **exact** amount below to complete your purchase.`)
+          .addFields(
+            { name: 'Payment Card', value: `\`${paymentCard}\``, inline: false },
+            { name: 'Amount to Pay', value: `**${result.payment.finalAmount.toFixed(2)} UZS**`, inline: true },
+            { name: 'Duration', value: `${planConfig.durationDays} days`, inline: true },
+            { name: 'Assignments', value: planConfig.assignments.toString(), inline: true },
+            { name: 'Tokens', value: planConfig.tokensPerMonth.toLocaleString(), inline: true },
+            { name: 'Grades', value: planConfig.grades.join(', '), inline: true },
+            { name: 'Payment ID', value: `\`${result.payment.id}\``, inline: false },
+            { name: 'Expires', value: new Date(result.payment.expiresAt).toLocaleString(), inline: true }
+          )
+          .setFooter({ text: 'Pay the EXACT amount (including decimals). Admin will verify your payment.' })
+          .setTimestamp();
+
+        await reply({ embeds: [embed] });
+      } catch (error: any) {
+        await reply(`❌ Error: ${error.message}`);
+      }
+    },
+  },
+
+  {
+    name: 'status',
+    aliases: ['mystatus', 'plan'],
+    description: 'Check your current plan and token status',
+    usage: '!status',
+    execute: async (_args, user, reply) => {
+      const linkedUser = await discordBotService.getUserByDiscordId(user.id);
+      if (!linkedUser) {
+        await reply('❌ Account not linked. Use `!link <code>` first.');
+        return;
+      }
+
+      const plan = linkedUser.tokenPlan;
+      
+      if (!plan) {
+        await reply('❌ No active plan. Use `!buy` to purchase a plan.');
+        return;
+      }
+
+      const isExpired = plan.expiresAt && new Date() > new Date(plan.expiresAt);
+      const statusColor = isExpired ? 0xFF0000 : plan.tokensRemaining > 0 ? 0x00FF00 : 0xFFAA00;
+
+      const embed = new EmbedBuilder()
+        .setTitle('Your Plan Status')
+        .setColor(statusColor)
+        .addFields(
+          { name: 'Plan Type', value: plan.planType, inline: true },
+          { name: 'Status', value: isExpired ? '❌ EXPIRED' : '✅ ACTIVE', inline: true },
+          { name: 'Tokens Remaining', value: plan.tokensRemaining.toLocaleString(), inline: true },
+          { name: 'Tokens Total', value: plan.tokensPerMonth.toLocaleString(), inline: true },
+          { name: 'Assignments Used', value: `${(plan as any).assignmentsUsed || 0} / ${(plan as any).assignmentsAllowed || '∞'}`, inline: true },
+          { name: 'Allowed Grades', value: (plan as any).allowedGrades?.join(', ') || 'All', inline: true },
+          { name: 'Activated', value: new Date(plan.activatedAt).toLocaleDateString(), inline: true },
+          { name: 'Expires', value: plan.expiresAt ? new Date(plan.expiresAt).toLocaleDateString() : 'Never', inline: true }
+        )
+        .setTimestamp();
+
+      if (isExpired) {
+        embed.setFooter({ text: 'Your plan has expired. Use !buy to purchase a new plan.' });
+      }
+
+      await reply({ embeds: [embed] });
     },
   },
 

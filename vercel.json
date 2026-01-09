@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://illusorily-vulpecular-wonda.ngrok-free.dev"
+      "destination": "https://illusorily-vulpecular-wonda.ngrok-free.dev/api/:path*"
     }
   ],
   "headers": [

@@ -386,6 +386,11 @@ model TokenPlan {
   activatedAt         DateTime       @default(now())
   expiresAt           DateTime?
   
+  // Plan-specific limits (set when plan is activated via payment)
+  allowedGrades       String[]       @default([])  // ["PASS", "MERIT", "DISTINCTION"]
+  assignmentsAllowed  Int            @default(0)   // Max assignments for this plan period
+  assignmentsUsed     Int            @default(0)   // Assignments generated in this plan period
+  
   // Relations
   user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   
